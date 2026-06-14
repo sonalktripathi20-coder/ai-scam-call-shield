@@ -637,9 +637,20 @@ class AIVoiceDetector:
         # === Always run heuristic classifier (uses new advanced features) ===
         heuristic_score, heuristic_class, heuristic_conf = classify_voice_from_features(features)
 
-        # === Try ML Model as secondary signal ===
+        # === Try PyTorch Deepfake Model as primary model signal ===
+        pytorch_score = None
+        if self.pytorch_loaded and self.pytorch_detector is not None:
+            try:
+                raw_score = self.pytorch_detector.predict_pcm(pcm_bytes)
+                pytorch_score = round(raw_score * 100.0, 1)
+                print(f"[AIVoiceDetector] PyTorch Deepfake={pytorch_score}%, Heuristic={heuristic_score}%")
+            except Exception as e:
+                print(f"[AIVoiceDetector Warn] PyTorch model failed: {e}")
+                pytorch_score = None
+
+        # === Try ML Model (Random Forest) as fallback model signal ===
         ml_score = None
-        if self.ml_loaded and self.ml_predictor is not None:
+        if pytorch_score is None and self.ml_loaded and self.ml_predictor is not None:
             try:
                 ml_result = self.ml_predictor.predict_bytes(file_bytes)
                 ml_score = round(ml_result["ai_probability"] * 100.0, 1)
@@ -649,7 +660,15 @@ class AIVoiceDetector:
                 ml_score = None
 
         # === Combine scores: Heuristic model is highly calibrated for real mic physics ===
-        if ml_score is not None:
+        if pytorch_score is not None:
+            # Blend PyTorch CNN (50%) and Heuristic (50%)
+            blended_score = round(pytorch_score * 0.50 + heuristic_score * 0.50, 1)
+            # If PyTorch model is extremely confident, trust it
+            if pytorch_score >= 80.0:
+                ai_score = max(blended_score, pytorch_score)
+            else:
+                ai_score = blended_score
+        elif ml_score is not None:
             # Blend ML model (40%) and Heuristic (60%) for high real-world stability
             blended_score = round(ml_score * 0.40 + heuristic_score * 0.60, 1)
             ai_score = blended_score
@@ -726,7 +745,9 @@ class AIVoiceDetector:
             reasons.append("Natural breathing pauses detected.")
 
         # Add model info to reasoning
-        if ml_score is not None:
+        if pytorch_score is not None:
+            reasons.append(f"[Combined analysis: Heuristic={heuristic_score}% + PyTorch={pytorch_score}%]")
+        elif ml_score is not None:
             reasons.append(f"[Combined analysis: Heuristic={heuristic_score}% + ML={ml_score}%]")
         else:
             reasons.append("[Analysis by advanced acoustic heuristic engine]")

@@ -3,7 +3,7 @@
 import axios from "axios";
 
 // ─── CHANGE THIS to your ngrok URL or deployed server URL ───────────────────
-export const BASE_URL = "https://your-ngrok-url.ngrok.io";
+export const BASE_URL = "https://slick-emus-hammer.loca.lt";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const api = axios.create({
@@ -90,15 +90,27 @@ export const fetchActiveCalls = async () => {
   const { data } = await api.get("/api/calls/active");
   return data;
 };
+export const subscribeToLiveScore = (callSid, onData, onError) => {
   let running = true;
   let lastTranscript = "";
 
   const poll = async () => {
     while (running) {
       try {
-        const { data } = await api.get(`/api/live/${callSid}`);
-        if (data && data.score !== undefined) {
-          onData(data);
+        const { data } = await api.get(`/api/calls/${callSid}`);
+        if (data) {
+          const score = data.final_score ?? 0;
+          const label = data.risk_label ?? "safe";
+          const scoreEvents = data.score_events ?? [];
+          const lastEvent = scoreEvents.length > 0 ? scoreEvents[scoreEvents.length - 1] : null;
+          const transcript = lastEvent ? lastEvent.transcript_chunk : "";
+
+          // Only invoke callback if we got valid data
+          onData({
+            score,
+            label,
+            transcript
+          });
         }
       } catch (e) {
         // Call ended or not active
@@ -114,3 +126,4 @@ export const fetchActiveCalls = async () => {
     running = false;
   };
 };
+

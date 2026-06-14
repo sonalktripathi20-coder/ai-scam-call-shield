@@ -50,6 +50,25 @@ class DeepfakeInference:
         self.seq_len = 200
         self.num_features = 13
         
+        # Check if the newly trained 3-class model exists first
+        ai_voice_model_path = os.path.join(os.path.dirname(__file__), "ai_voice_model.pth")
+        if os.path.exists(ai_voice_model_path):
+            try:
+                try:
+                    from .ai_voice_detector import AIVoiceDetector as PyTorchAIVoiceDetector
+                except ImportError:
+                    from ai_voice_detector import AIVoiceDetector as PyTorchAIVoiceDetector
+                
+                self.pytorch_detector = PyTorchAIVoiceDetector(model_path=ai_voice_model_path, device=device)
+                if self.pytorch_detector.model_loaded:
+                    self.model_loaded = True
+                    self.is_3class = True
+                    print(f"[Deepfake AI] Loaded 3-class voice model from {ai_voice_model_path}")
+                    return
+            except Exception as e:
+                print(f"[Deepfake AI Warn] Failed to load 3-class model: {e}. Falling back to 2-class classifier.")
+
+        self.is_3class = False
         if model_path is None:
             model_path = os.path.join(os.path.dirname(__file__), "deepfake_model.pth")
             
@@ -68,11 +87,15 @@ class DeepfakeInference:
         if os.path.exists(model_path):
             try:
                 checkpoint = torch.load(model_path, map_location=self.device)
-                self.model.load_state_dict(checkpoint["model_state"])
+                if isinstance(checkpoint, dict) and "model_state" in checkpoint:
+                    self.model.load_state_dict(checkpoint["model_state"])
+                else:
+                    self.model.load_state_dict(checkpoint)
                 self.model.to(self.device)
                 self.model.eval()
                 self.model_loaded = True
-                print(f"[Deepfake AI] Loaded model from {model_path} (Acc={checkpoint.get('best_acc', 0.0):.2%})")
+                best_acc = checkpoint.get("best_acc", 0.0) if isinstance(checkpoint, dict) else 0.0
+                print(f"[Deepfake AI] Loaded model from {model_path} (Acc={best_acc:.2%})")
             except Exception as e:
                 print(f"[Deepfake AI Warn] Failed to load model weights: {e}")
         else:
@@ -86,6 +109,16 @@ class DeepfakeInference:
         if not self.model_loaded:
             # Fallback Demo Mode heuristics if model is not trained yet
             return self._demo_predict(pcm_bytes)
+            
+        if getattr(self, "is_3class", False):
+            try:
+                # model.ai_voice_detector returns (prediction, probabilities)
+                _, probs = self.pytorch_detector.predict_pcm(pcm_bytes)
+                # Class 0 is Human, so synthetic/AI probability is 1.0 - probs["Human"]
+                return float(1.0 - probs.get("Human", 0.0))
+            except Exception as e:
+                print(f"[Deepfake AI Error] 3-class prediction failed: {e}")
+                return 0.0
             
         try:
             signal = pcm_to_float32(pcm_bytes)

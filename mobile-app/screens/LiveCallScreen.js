@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../App";
-import { declineCall } from "../api";
+import { declineCall, subscribeToLiveScore } from "../api";
 
 const { width, height } = Dimensions.get("window");
 
@@ -64,31 +64,28 @@ export default function LiveCallScreen({ route, navigation }) {
   // ── Poll live score from backend ───────────
   useEffect(() => {
     if (!callSid) return;
-    let running = true;
-    const poll = async () => {
-      while (running) {
-        try {
-          const res = await fetch(
-            `${require('../api').BASE_URL}/api/live/${callSid}`,
-            { signal: AbortSignal.timeout(3000) }
-          );
-          if (res.ok) {
-            const data = await res.json();
-            if (data.score !== undefined) {
-              setScore(data.score);
-              setLabel(data.label);
-              if (data.transcript) {
-                setTranscript(prev => [...prev.slice(-6), data.transcript]);
-              }
+    const unsubscribe = subscribeToLiveScore(
+      callSid,
+      (data) => {
+        setScore(data.score);
+        setLabel(data.label);
+        if (data.transcript) {
+          setTranscript(prev => {
+            // Avoid duplicating the last chunk if it hasn't changed
+            if (prev.length > 0 && prev[prev.length - 1] === data.transcript) {
+              return prev;
             }
-          }
-        } catch { /* ignore timeout */ }
-        await new Promise(r => setTimeout(r, 1500));
+            return [...prev.slice(-6), data.transcript];
+          });
+        }
+      },
+      (err) => {
+        console.warn("[LiveCall] Polling error:", err);
       }
-    };
-    poll();
-    return () => { running = false; };
+    );
+    return unsubscribe;
   }, [callSid]);
+
 
   const formatTime = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
 

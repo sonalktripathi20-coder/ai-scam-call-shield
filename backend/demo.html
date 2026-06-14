@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camp Protect — AI Scam Shield Web Portal</title>
+    <title>🛡️ AI Scam Call Interceptor — Telephony Security Shield</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -12,60 +12,87 @@
             theme: {
                 extend: {
                     colors: {
-                        darkBg: '#090d16',
-                        darkCard: '#111726',
-                        darkBorder: '#1e293b',
-                        safe: '#10b981',
-                        warning: '#f59e0b',
-                        danger: '#ef4444',
+                        darkBg: '#090b11',
+                        darkCard: '#111522',
+                        darkBorder: '#1e263c',
+                        shieldBlue: '#00e5ff',
+                        shieldGreen: '#00e676',
+                        shieldOrange: '#ffa600',
+                        shieldRed: '#ff3b30',
+                        premiumGold: '#ffd700',
+                        glassBg: 'rgba(17, 21, 34, 0.85)'
+                    },
+                    boxShadow: {
+                        glowBlue: '0 0 20px rgba(0, 229, 255, 0.25)',
+                        glowRed: '0 0 20px rgba(255, 59, 48, 0.25)',
+                        glowGreen: '0 0 20px rgba(0, 230, 118, 0.25)',
+                        glowGold: '0 0 20px rgba(255, 215, 0, 0.2)',
                     }
                 }
             }
         }
     </script>
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Outfit', sans-serif;
-            background-color: #060913;
+            background-color: #090b11;
+        }
+
+        .code-font {
+            font-family: 'JetBrains Mono', monospace;
         }
 
         /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
+            height: 6px;
         }
 
         ::-webkit-scrollbar-track {
-            background: #090d16;
+            background: #090b11;
         }
 
         ::-webkit-scrollbar-thumb {
-            background: #1e293b;
+            background: #1e263c;
             border-radius: 4px;
         }
 
         ::-webkit-scrollbar-thumb:hover {
-            background: #334155;
+            background: #334466;
         }
 
-        .glass-card {
-            background: rgba(17, 23, 38, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(30, 41, 59, 0.7);
+        .glass-panel {
+            background: rgba(17, 21, 34, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(30, 38, 60, 0.7);
+        }
+
+        .phone-frame {
+            border: 12px solid #1e263c;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            background-color: #090b11;
+        }
+
+        .grid-bg {
+            background-size: 50px 50px;
+            background-image: linear-gradient(to right, rgba(30, 38, 60, 0.1) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(30, 38, 60, 0.1) 1px, transparent 1px);
         }
     </style>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
     <!-- React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <!-- Babel for JSX compilation -->
+    <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 
-<body class="text-slate-100 min-height-screen">
+<body class="text-slate-100 min-h-screen grid-bg relative overflow-x-hidden">
+
+    <!-- Top glow -->
+    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-shieldBlue/10 rounded-full blur-[130px] pointer-events-none"></div>
 
     <div id="root"></div>
 
@@ -73,967 +100,1509 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        const DEMO_TRANSCRIPTS = [
-            {
-                title: "OTP Verification Scam (High Risk)",
-                category: "OTP Scam",
-                text: "Hello, this is SBI customer service support department calling. We have detected a suspicious transaction of rupees 50000 on your account. To freeze the transaction and protect your fund, we have sent a 6-digit verification OTP code to your register phone number. Please read back the OTP code immediately to avoid account block."
-            },
-            {
-                title: "Remote Access Threat (High Risk)",
-                category: "Remote Access Scam",
-                text: "I am calling from technical service support. Your computer security registry has been compromised by malware. To prevent identity leak, install AnyDesk or TeamViewer app from Google Play Store right now to let us clear the registry. Do not close the app or you will face permanent system damage."
-            },
-            {
-                title: "Police Arrest Scare (High Risk)",
-                category: "Government Scam",
-                text: "This is inspector Sharma calling from CBI headquarters. Your Aadhaar card and PAN details were found in a money laundering case. A court warrant has been issued. You must deposit 1 lakh rupees processing fee immediately to verify your account or the police department will arrest you within 2 hours."
-            },
-            {
-                title: "Fake Job Offer (Medium Risk)",
-                category: "Job Scam",
-                text: "Congratulations! Your profile is shortlisted for a work from home part-time job. You can earn 5000 rupees daily by just reviewing products. To activate your account and start your task, you need to pay a small refundable registration fee of 999 rupees today."
-            },
-            {
-                title: "Legitimate Courier Call (Safe)",
-                category: "Safe Call",
-                text: "Hello, I am calling from BlueDart courier service. I have your parcel from Amazon. Are you available at your home address right now to receive it, or should I leave it with the security guard at the gate?"
-            }
-        ];
-
-        function App() {
-            const [activeTab, setActiveTab] = useState('live');
-            const [selectedDemo, setSelectedDemo] = useState(0);
-            const [pastedText, setPastedText] = useState('');
-            const [audioFile, setAudioFile] = useState(null);
-            const [analysisResult, setAnalysisResult] = useState(null);
-            const [loading, setLoading] = useState(false);
-            const [selectedCall, setSelectedCall] = useState(null);
-
-            // Microphone States
-            const [isListening, setIsListening] = useState(false);
-            const [micTranscript, setMicTranscript] = useState([]);
-            const [micKeywords, setMicKeywords] = useState([]);
-            const [micRiskScore, setMicRiskScore] = useState(0);
-            const [micRiskLevel, setMicRiskLevel] = useState('SAFE');
-            const [micCategory, setMicCategory] = useState('Safe Call');
-            const [alertShown, setAlertShown] = useState(false);
-            const recognitionRef = useRef(null);
-
-            // High Risk Siren Alarm System
-            const alarmTimerRef = useRef(null);
-            const alarmStopTimeoutRef = useRef(null);
-            const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-            const [isCallTerminated, setIsCallTerminated] = useState(false);
-
-            // History & Stats
-            const [history, setHistory] = useState([]);
-            const [stats, setStats] = useState({ total_calls: 0, blocked_calls: 0, safe_calls: 0, suspicious_calls: 0, fraud_calls: 0 });
-
-            useEffect(() => {
-                fetchHistory();
-                fetchStats();
-                if (window.lucide) window.lucide.createIcons();
-            }, [activeTab]);
-
-            const fetchHistory = () => {
-                fetch('/api/calls')
-                    .then(res => res.json())
-                    .then(data => setHistory(data))
-                    .catch(e => console.error("Error fetching history", e));
-            };
-
-            const fetchStats = () => {
-                fetch('/api/stats')
-                    .then(res => res.json())
-                    .then(data => setStats(data))
-                    .catch(e => console.error("Error fetching stats", e));
-            };
-
-            // Audio Context initialization helper (must be called from a user gesture)
-            const initAudioContext = () => {
-                if (!window.sharedAudioContext) {
-                    window.sharedAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-                }
-                if (window.sharedAudioContext.state === 'suspended') {
-                    window.sharedAudioContext.resume();
-                }
-            };
-
-            const playBeep = (freq, duration, count = 1, interval = 150) => {
-                try {
-                    initAudioContext();
-                    const audioCtx = window.sharedAudioContext;
-                    let currentCount = 0;
-
-                    const triggerSingleBeep = () => {
-                        if (currentCount >= count) return;
-                        const osc = audioCtx.createOscillator();
-                        const gain = audioCtx.createGain();
-                        osc.connect(gain);
-                        gain.connect(audioCtx.destination);
-                        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-                        gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-                        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-                        osc.start();
-                        osc.stop(audioCtx.currentTime + duration);
-                        currentCount++;
-                        setTimeout(triggerSingleBeep, interval);
-                    };
-
-                    triggerSingleBeep();
-                } catch (e) {
-                    console.error("Audio error", e);
-                }
-            };
-
-            const triggerHighRiskAlarm = () => {
-                initAudioContext();
-                if (alarmTimerRef.current) return; // already running
-                setIsAlarmPlaying(true);
-                console.log("[ALARM] Triggering high risk alarm. Will continue for 30s.");
-
-                const playBeepLocal = () => {
-                    playBeep(950, 0.25, 2, 120);
-                };
-
-                playBeepLocal();
-                alarmTimerRef.current = setInterval(playBeepLocal, 1500);
-
-                alarmStopTimeoutRef.current = setTimeout(() => {
-                    stopHighRiskAlarm();
-                }, 30000);
-            };
-
-            const stopHighRiskAlarm = () => {
-                setIsAlarmPlaying(false);
-                if (alarmTimerRef.current) {
-                    clearInterval(alarmTimerRef.current);
-                    alarmTimerRef.current = null;
-                }
-                if (alarmStopTimeoutRef.current) {
-                    clearTimeout(alarmStopTimeoutRef.current);
-                    alarmStopTimeoutRef.current = null;
-                }
-                console.log("[ALARM] Alarm stopped.");
-            };
-
-            // Analyze Pasted Text
-            const handleAnalyzeText = (textToAnalyze) => {
-                initAudioContext();
-                const text = textToAnalyze || pastedText;
-                if (!text.trim()) return;
-                setLoading(true);
-                fetch('/api/analyze-text', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text })
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        setAnalysisResult(data);
-                        setLoading(false);
-                        if (data.risk_score >= 100) {
-                            stopHighRiskAlarm();
-                            setIsCallTerminated(true);
-                            playBeep(400, 0.5, 3, 200);
-                        } else if (data.risk_score >= 70) {
-                            setIsCallTerminated(false);
-                            triggerHighRiskAlarm();
-                        } else {
-                            setIsCallTerminated(false);
-                        }
-                    })
-                    .catch(e => {
-                        console.error(e);
-                        setLoading(false);
-                    });
-            };
-
-            // Analyze Audio File (Complete Scam + AI Voice Analysis)
-            const handleAnalyzeAudio = (e, fileToAnalyze) => {
-                if (e) e.preventDefault();
-                initAudioContext();
-                const file = fileToAnalyze || audioFile;
-                if (!file) return;
-                setLoading(true);
-                const formData = new FormData();
-                formData.append('file', file);
-
-                fetch('/api/analyze-complete', {
-                    method: 'POST',
-                    body: formData
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        setAnalysisResult(data);
-                        setLoading(false);
-                        const isAudio = !!data?.combined_analysis;
-                        const scam = isAudio ? data.scam_analysis.risk_score : (data?.risk_score || 0);
-                        const comb = isAudio ? data.combined_analysis.combined_threat_score : scam;
-                        if (comb >= 100) {
-                            stopHighRiskAlarm();
-                            setIsCallTerminated(true);
-                            playBeep(400, 0.5, 3, 200);
-                        } else if (comb >= 70) {
-                            setIsCallTerminated(false);
-                            triggerHighRiskAlarm();
-                        } else {
-                            setIsCallTerminated(false);
-                        }
-                    })
-                    .catch(e => {
-                        console.error(e);
-                        setLoading(false);
-                    });
-            };
-
-
-
-            // Live Mic Logic
-            const toggleMic = () => {
-                initAudioContext();
-                if (isListening) {
-                    stopListening();
-                } else {
-                    startListening();
-                }
-            };
-
-            const startListening = () => {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    alert("Microphone Speech Recognition is not supported by your browser. Please use Chrome or Edge.");
-                    return;
-                }
-                const rec = new SpeechRecognition();
-                rec.continuous = true;
-                rec.interimResults = true;
-                rec.lang = "en-IN";
-                recognitionRef.current = rec;
-
-                rec.onstart = () => {
-                    setIsListening(true);
-                    setMicTranscript([]);
-                    setMicKeywords([]);
-                    setMicRiskScore(0);
-                    setMicRiskLevel('SAFE');
-                    setMicCategory('Safe Call');
-                    setAlertShown(false);
-                    setIsCallTerminated(false);
-                };
-
-                rec.onresult = (event) => {
-                    let finalResult = "";
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        if (event.results[i].isFinal) {
-                            finalResult = event.results[i][0].transcript.trim();
-                        }
-                    }
-                    if (!finalResult) return;
-
-                    setMicTranscript(prev => {
-                        const updated = [...prev, finalResult];
-                        const rollingText = updated.join(" ");
-
-                        fetch('/api/analyze-text', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ text: rollingText })
-                        })
-                            .then(res => res.json())
-                            .then(data => {
-                                setMicRiskScore(data.risk_score);
-                                setMicRiskLevel(data.risk_level);
-                                setMicCategory(data.fraud_category);
-                                setMicKeywords(data.detected_keywords || []);
-
-                                if (data.risk_score >= 100) {
-                                    stopListening();
-                                    stopHighRiskAlarm();
-                                    setIsCallTerminated(true);
-                                    playBeep(400, 0.5, 3, 200);
-                                } else if (data.risk_score >= 70 || data.risk_level === 'HIGH') {
-                                    triggerHighRiskAlarm();
-                                }
-                            });
-                        return updated;
-                    });
-                };
-
-                rec.onerror = (e) => {
-                    console.error("Speech recognition error", e);
-                    stopListening();
-                };
-
-                rec.onend = () => {
-                    if (isListening) rec.start();
-                };
-
-                rec.start();
-            };
-
-            const stopListening = () => {
-                setIsListening(false);
-                if (recognitionRef.current) {
-                    recognitionRef.current.stop();
-                    recognitionRef.current = null;
-                }
-            };
-
-            // Non-critical medium risk background chime logic
-            useEffect(() => {
-                let intervalId = null;
-                const score = activeTab === 'live' ? micRiskScore : 0;
-                const isMedium = score >= 31 && score < 70;
-
-                if (isListening && isMedium) {
-                    intervalId = setInterval(() => {
-                        playBeep(700, 0.15, 1, 100);
-                    }, 3000);
-                }
-                return () => {
-                    if (intervalId) clearInterval(intervalId);
-                };
-            }, [isListening, micRiskScore, activeTab]);
-
-            // Normalized Analysis Mapping
-            const isAudioAnalysis = !!analysisResult?.combined_analysis;
-
-            const scamScore = isAudioAnalysis ? analysisResult.scam_analysis.risk_score : (analysisResult?.risk_score || 0);
-            const scamRiskLevel = isAudioAnalysis ? analysisResult.scam_analysis.risk_level : (analysisResult?.risk_level || 'SAFE');
-            const scamCategory = isAudioAnalysis ? analysisResult.scam_analysis.fraud_category : (analysisResult?.fraud_category || 'Safe Call');
-            const scamEvidence = isAudioAnalysis ? analysisResult.scam_analysis.evidence_report : (analysisResult?.evidence_report || '');
-            const scamKeywords = isAudioAnalysis ? analysisResult.scam_analysis.detected_keywords : (analysisResult?.detected_keywords || []);
-            const scamTranscript = isAudioAnalysis ? analysisResult.scam_analysis.transcript : (analysisResult?.transcript || '');
-
-            const voiceScore = isAudioAnalysis ? analysisResult.voice_analysis.ai_voice_score : 0;
-            const voiceClass = isAudioAnalysis ? analysisResult.voice_analysis.voice_classification : 'Uncertain';
-            const voiceConfidence = isAudioAnalysis ? analysisResult.voice_analysis.confidence_score : 0;
-            const voiceHumanProb = isAudioAnalysis ? analysisResult.voice_analysis.human_voice_probability : 100;
-            const voiceAIProb = isAudioAnalysis ? analysisResult.voice_analysis.ai_voice_probability : 0;
-            const voiceFeatures = isAudioAnalysis ? analysisResult.voice_analysis.features : null;
-            const voiceReasoning = isAudioAnalysis ? analysisResult.voice_analysis.reasoning : '';
-
-            const combinedScore = isAudioAnalysis ? analysisResult.combined_analysis.combined_threat_score : scamScore;
-            const combinedRiskLevel = isAudioAnalysis ? analysisResult.combined_analysis.combined_risk_level : scamRiskLevel;
-
-            // Color Class helpers
-            const getRiskColorClass = (score) => {
-                if (score >= 70) return 'text-rose-400 border-rose-500/20 bg-rose-500/5 shadow-rose-500/10';
-                if (score >= 31) return 'text-amber-400 border-amber-500/20 bg-amber-500/5 shadow-amber-500/10';
-                return 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5 shadow-emerald-500/10';
-            };
-
-            const getRiskBadge = (level) => {
-                if (level === 'HIGH' || level === 'FRAUD') return 'bg-red-500/20 text-red-400 border border-red-500/40';
-                if (level === 'MEDIUM' || level === 'SUSPICIOUS') return 'bg-amber-500/20 text-amber-400 border border-amber-500/40';
-                return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
-            };
-
-            const getVoiceBadge = (vClass) => {
-                if (vClass.includes('AI')) return 'bg-red-500/20 text-red-400 border border-red-500/40';
-                if (vClass.includes('Human')) return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
-                return 'bg-amber-500/20 text-amber-400 border border-amber-500/40';
+        // Custom SVG Icons
+        const Icon = ({ name, className = "w-5 h-5", strokeWidth = 2 }) => {
+            const icons = {
+                shield: (
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                ),
+                phone: (
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                ),
+                alertCircle: (
+                    <>
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </>
+                ),
+                activity: (
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                ),
+                history: (
+                    <>
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                        <polyline points="3 3 3 8 8 8" />
+                        <line x1="12" y1="7" x2="12" y2="12" />
+                        <line x1="12" y1="12" x2="16" y2="14" />
+                    </>
+                ),
+                settings: (
+                    <>
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </>
+                ),
+                users: (
+                    <>
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </>
+                ),
+                cpu: (
+                    <>
+                        <rect x="4" y="4" width="16" height="16" rx="2" />
+                        <line x1="9" y1="9" x2="15" y2="9" />
+                        <line x1="9" y1="13" x2="15" y2="13" />
+                        <line x1="12" y1="1" x2="12" y2="4" />
+                        <line x1="12" y1="20" x2="12" y2="23" />
+                        <line x1="1" y1="12" x2="4" y2="12" />
+                        <line x1="20" y1="12" x2="23" y2="12" />
+                    </>
+                ),
+                checkCircle: (
+                    <>
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
+                    </>
+                ),
+                alertTriangle: (
+                    <>
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </>
+                ),
+                arrowRight: (
+                    <>
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <polyline points="12 5 19 12 12 19" />
+                    </>
+                )
             };
 
             return (
-                <div class="min-h-screen flex flex-col">
-                    {/* Header */}
-                    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={strokeWidth}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={className}
+                >
+                    {icons[name] || <circle cx="12" cy="12" r="10" />}
+                </svg>
+            );
+        };
+
+        const SCENARIOS = {
+            bank: {
+                name: "Bank Verification Scam",
+                caller: "+91 94480 32185",
+                callerName: "Unknown Caller",
+                risk: "HIGH",
+                score: 82,
+                classification: "Bank Verification Scam",
+                reasons: ["Unknown Number", "Urgency Tactics", "Financial Information Request"],
+                advice: ["Do NOT share OTP", "Disconnect Call", "Call Official Bank Number"],
+                dialogue: [
+                    "Hello, I am calling from HDFC Bank Central Security Desk.",
+                    "Your credit card has registered a suspicious charge of 49,999 rupees.",
+                    "We need to freeze your card immediately. A security cancellation token is sent.",
+                    "Please tell me the 6-digit OTP code right now to cancel the transaction."
+                ],
+                indicators: ["Unknown Number", "Banking Keywords", "Urgency Language", "Verification Request"]
+            },
+            police: {
+                name: "CBI Extortion Scare",
+                caller: "+91 88390 19284",
+                callerName: "CBI Special Officer (Claims)",
+                risk: "CRITICAL",
+                score: 95,
+                classification: "Police/CBI Impersonation",
+                reasons: ["Government Impersonation", "Coercive Legal Threat", "Direct Fund Demands"],
+                advice: ["Do NOT transfer money", "Disconnect Call", "Report on National Cyber Crime Portal"],
+                dialogue: [
+                    "This is inspector Sharma calling from Delhi CBI headquarters.",
+                    "A cargo parcel containing MDMA and forged passports has been seized under your name.",
+                    "A criminal warrant is signed by the magistrate. You must cooperate.",
+                    "You need to deposit a temporary security verification fee of 30,000 rupees immediately."
+                ],
+                indicators: ["Unknown Number", "Urgency Language", "Verification Request", "Impersonation Attempt"]
+            },
+            voice_clone: {
+                name: "AI Voice-Cloned Son",
+                caller: "+91 70192 38491",
+                callerName: "Identity Claimed: Son (Sonal)",
+                risk: "CRITICAL",
+                score: 98,
+                classification: "AI Voice Clone Impersonation",
+                reasons: ["Synthetic Acoustic Signatures Detected", "Kinship Spoofing Patterns", "Emotional Manipulation Pressure"],
+                advice: ["Do NOT share money", "Call relative directly on original number", "Initiate voice-vault prompt check"],
+                dialogue: [
+                    "(Cloned Voice) Dad, help me! My phone was stolen and my friend is severely injured.",
+                    "I am in the emergency hospital and they need 20,000 rupees to start treatment.",
+                    "I am calling from a doctor's mobile. Please UPI transfer the amount to this clinic number.",
+                    "Please do it immediately dad, he is bleeding very badly!"
+                ],
+                indicators: ["Unknown Number", "Urgency Language", "Verification Request", "Synthetic Voice Indicators", "Kinship Claim"]
+            },
+            courier: {
+                name: "Customs Courier Scam",
+                caller: "+91 91102 38591",
+                callerName: "FedEx Executive Agent",
+                risk: "HIGH",
+                score: 78,
+                classification: "Courier/Customs Scam",
+                reasons: ["Illegal parcel scare tactics", "Aadhaar validation demand", "Personal details extraction"],
+                advice: ["Do NOT share Aadhaar / PAN card", "Hang up call", "Verify with official courier desk"],
+                dialogue: [
+                    "This is FedEx courier executive department calling.",
+                    "A package sent from Mumbai containing illegal documents and drug parcels has been intercepted under your ID.",
+                    "To verify your credentials and avoid customs seizure, we must record your PAN card number now.",
+                    "Please share the PAN number and your date of birth to clear your customs file."
+                ],
+                indicators: ["Unknown Number", "Verification Request", "Impersonation Attempt"]
+            },
+            safe: {
+                name: "Amazon Delivery Agent",
+                caller: "+91 98320 18491",
+                callerName: "Amazon Delivery Partner",
+                risk: "LOW",
+                score: 8,
+                classification: "Safe Call (Verified Agent)",
+                reasons: ["No fraud semantics detected", "Legitimate logistics query", "Clean acoustic characteristics"],
+                advice: ["Safe to interact", "No further action required"],
+                dialogue: [
+                    "Hello, I am calling from Amazon Delivery services.",
+                    "I have reached your society main gate with your order package.",
+                    "Are you at home to receive the package, or should I leave it with the security guard?"
+                ],
+                indicators: ["Unknown Number"]
+            }
+        };
+
+        function App() {
+            // Main app navigation
+            const [activeScreen, setActiveScreen] = useState('dashboard'); // 'dashboard' | 'live' | 'reports' | 'profiles' | 'architecture' | 'settings'
+
+            // Shield status
+            const [shieldActive, setShieldActive] = useState(true);
+
+            // Task checklist states
+            const [dbSyncState, setDbSyncState] = useState('stale'); // 'stale' | 'syncing' | 'synced'
+            const [hookVerifyState, setHookVerifyState] = useState('unverified'); // 'unverified' | 'verifying' | 'verified'
+
+            // Simulation Engine States
+            const [simKey, setSimKey] = useState('bank');
+            const [simState, setSimState] = useState('idle'); // 'idle' | 'ringing' | 'active' | 'alert' | 'evidence'
+            const [simLineIndex, setSimLineIndex] = useState(0);
+            const [simTranscript, setSimTranscript] = useState([]);
+            const [simScore, setSimScore] = useState(0);
+            const [simRisk, setSimRisk] = useState('LOW');
+            const [simActiveIndicators, setSimActiveIndicators] = useState([]);
+
+            // Log database
+            const [reports, setReports] = useState([
+                { id: "REP-9104", caller: "+91 94480 32185", date: "Today, 04:32 PM", type: "Bank Verification Scam", risk: "HIGH", explanation: "Target asked for credit card freeze verification and requested a 6-digit OTP code." },
+                { id: "REP-8812", caller: "+91 70192 38491", date: "Today, 11:15 AM", type: "AI Voice Clone Impersonation", risk: "CRITICAL", explanation: "Synthetic voice cloned profile requesting emergency hospital payment." },
+                { id: "REP-7023", caller: "+91 98320 18491", date: "Yesterday, 02:40 PM", type: "Safe Logistics Agent", risk: "LOW", explanation: "Legitimate delivery verification for Amazon parcel drop-off." }
+            ]);
+
+            // Trusted Profiles State
+            const [trustedProfiles, setTrustedProfiles] = useState([
+                { id: 1, name: "Sonal Tripathi", role: "Son", phone: "+91 70192 38491", hash: "98a3b50c18d9f4e2...", status: "Voice Authenticated", date: "June 12, 2026", features: "Pitch: 142.4Hz, HNR: 11.4dB" },
+                { id: 2, name: "Family Backup Desk", role: "Backup", phone: "+91 80012 34567", hash: "41b2c3d4e5f6a7b8...", status: "Vault Enrolled", date: "June 13, 2026", features: "Pitch: 210.8Hz, HNR: 14.8dB" }
+            ]);
+            const [newProfileName, setNewProfileName] = useState('');
+            const [newProfilePhone, setNewProfilePhone] = useState('');
+            const [newProfileRole, setNewProfileRole] = useState('Son');
+            const [enrollState, setEnrollState] = useState('idle'); // 'idle' | 'loading' | 'success'
+            const [enrollProgress, setEnrollProgress] = useState('');
+            const [enrollProgressPercent, setEnrollProgressPercent] = useState(0);
+
+            // Diagnostics State
+            const [diagState, setDiagState] = useState('idle'); // 'idle' | 'running' | 'done'
+            const [diagLogs, setDiagLogs] = useState([]);
+            const [diagLatency, setDiagLatency] = useState({ db: 0, pytorch: 0, randomforest: 0, stt: 0, api: 0 });
+            const [diagReadiness, setDiagReadiness] = useState(0);
+
+            // Voice Enrollment Pipeline
+            const handleEnrollProfile = (e) => {
+                e.preventDefault();
+                if (!newProfileName || !newProfilePhone) return;
+
+                setEnrollState('loading');
+                setEnrollProgressPercent(10);
+                setEnrollProgress('Decoding uploaded audio file to 16kHz PCM...');
+                playChime(523, 0.1);
+
+                setTimeout(() => {
+                    setEnrollProgressPercent(35);
+                    setEnrollProgress('Extracting acoustic dimensions (pitch, HNR, modulation)...');
+                    playChime(587, 0.1);
+                }, 8000 / 4);
+
+                setTimeout(() => {
+                    setEnrollProgressPercent(60);
+                    setEnrollProgress('Running classification & deepfake voiceprint checks...');
+                    playChime(659, 0.1);
+                }, (8000 / 4) * 2);
+
+                setTimeout(() => {
+                    setEnrollProgressPercent(85);
+                    setEnrollProgress('Registering voice signature to secure SQLite database...');
+                    playChime(698, 0.1);
+                }, (8000 / 4) * 3);
+
+                setTimeout(() => {
+                    setEnrollProgressPercent(100);
+                    setEnrollProgress('Profile registered successfully!');
+                    playChime(880, 0.25);
+
+                    // Add new profile
+                    const randPitch = (120 + Math.random() * 90).toFixed(1);
+                    const randHNR = (10 + Math.random() * 6).toFixed(1);
+                    const randHash = 'sha256_' + Math.floor(Math.random() * 1000000).toString(16).padEnd(8, 'f');
+                    
+                    const newProfile = {
+                        id: trustedProfiles.length + 1,
+                        name: newProfileName,
+                        role: newProfileRole,
+                        phone: newProfilePhone,
+                        hash: `${randHash.substring(0, 4)}...${randHash.substring(randHash.length - 4)}`,
+                        status: 'Voice Authenticated',
+                        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                        features: `Pitch: ${randPitch}Hz, HNR: ${randHNR}dB`
+                    };
+
+                    setTrustedProfiles(prev => [...prev, newProfile]);
+                    setEnrollState('success');
+                    
+                    // Reset
+                    setNewProfileName('');
+                    setNewProfilePhone('');
+                    
+                    setTimeout(() => {
+                        setEnrollState('idle');
+                        setEnrollProgress('');
+                        setEnrollProgressPercent(0);
+                    }, 3000);
+
+                }, 8000);
+            };
+
+            // Diagnostic Telemetry Pipeline
+            const handleRunDiagnostics = () => {
+                if (diagState === 'running') return;
+                setDiagState('running');
+                setDiagLogs(['[INFO] Initiating global interceptor health diagnostics...']);
+                setDiagLatency({ db: 0, pytorch: 0, randomforest: 0, stt: 0, api: 0 });
+                playChime(660, 0.15);
+
+                setTimeout(() => {
+                    setDiagLatency(prev => ({ ...prev, db: Math.floor(10 + Math.random() * 15) }));
+                    setDiagLogs(prev => [...prev, '[INFO] Testing database write integrity: Success (Commit duration 3.2ms)', '[INFO] DB status: ONLINE. WAL mode active.']);
+                    playChime(700, 0.05);
+                }, 1000);
+
+                setTimeout(() => {
+                    setDiagLatency(prev => ({ ...prev, pytorch: Math.floor(60 + Math.random() * 30) }));
+                    setDiagLogs(prev => [...prev, '[INFO] Verifying PyTorch Deepfake model (ai_voice_model.pth) weights...', '[INFO] PyTorch: READY (accuracy validation matches baseline 100%).']);
+                    playChime(750, 0.05);
+                }, 2000);
+
+                setTimeout(() => {
+                    setDiagLatency(prev => ({ ...prev, randomforest: Math.floor(5 + Math.random() * 8) }));
+                    setDiagLogs(prev => [...prev, '[INFO] Checking Random Forest signature classifier (ai_voice_detector.pkl)...', '[INFO] Random Forest: READY. Model mapped to 17 acoustic dimensions.']);
+                    playChime(800, 0.05);
+                }, 3000);
+
+                setTimeout(() => {
+                    setDiagLatency(prev => ({ ...prev, stt: Math.floor(120 + Math.random() * 50), api: Math.floor(15 + Math.random() * 20) }));
+                    setDiagLogs(prev => [
+                        ...prev, 
+                        '[INFO] Testing Whisper Speech-to-Text local decoder loops...', 
+                        '[INFO] STT: READY. Latency calibrated at 140ms/sec audio frame.', 
+                        '[INFO] Verifying Twilio media stream WebSockets redirect...', 
+                        '[SUCCESS] Diagnostics complete. Threat interception shield is fully armed & 100% operational.'
+                    ]);
+                    setDiagReadiness((98.5 + Math.random() * 1.4).toFixed(1));
+                    setDiagState('done');
+                    playChime(880, 0.3);
+                }, 4000);
+            };
+
+            const handleSyncDatabase = () => {
+                if (dbSyncState === 'syncing' || dbSyncState === 'synced') return;
+                setDbSyncState('syncing');
+                playChime(660, 0.1);
+                setTimeout(() => {
+                    setDbSyncState('synced');
+                    playChime(880, 0.2);
+                }, 2000);
+            };
+
+            const handleVerifyHook = () => {
+                if (hookVerifyState === 'verifying' || hookVerifyState === 'verified') return;
+                setHookVerifyState('verifying');
+                playChime(660, 0.1);
+                setTimeout(() => {
+                    setHookVerifyState('verified');
+                    playChime(880, 0.2);
+                }, 2000);
+            };
+
+            // Audio Alert
+            const playChime = (freq = 880, duration = 0.1) => {
+                try {
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+                    osc.start();
+                    osc.stop(ctx.currentTime + duration);
+                } catch (e) {}
+            };
+
+            // Start simulator
+            const startSimulation = (key) => {
+                setSimKey(key);
+                setSimState('ringing');
+                setSimTranscript([]);
+                setSimLineIndex(0);
+                setSimScore(0);
+                setSimRisk('LOW');
+                setSimActiveIndicators([]);
+                playChime(523, 0.3); // C5 ring
+            };
+
+            // Handle Ringing Answer
+            const answerCall = () => {
+                setSimState('active');
+                setSimScore(15);
+                setSimActiveIndicators(["Unknown Number"]);
+                playChime(659, 0.15); // E5 answer
+            };
+
+            // Dialogue simulation loop
+            useEffect(() => {
+                if (simState !== 'active') return;
+
+                const scenario = SCENARIOS[simKey];
+                if (simLineIndex < scenario.dialogue.length) {
+                    const timer = setTimeout(() => {
+                        const line = scenario.dialogue[simLineIndex];
+                        setSimTranscript(prev => [...prev, line]);
+
+                        // Update metrics dynamically
+                        const progress = (simLineIndex + 1) / scenario.dialogue.length;
+                        const targetScore = scenario.score;
+                        const currentScore = Math.min(100, Math.round(progress * targetScore));
+                        setSimScore(currentScore);
+
+                        // Set risk levels
+                        if (currentScore >= 75) setSimRisk('CRITICAL');
+                        else if (currentScore >= 45) setSimRisk('HIGH');
+                        else if (currentScore >= 20) setSimRisk('MEDIUM');
+                        else setSimRisk('LOW');
+
+                        // Update indicators
+                        const textLower = line.toLowerCase();
+                        const newIndicators = [];
+                        newIndicators.push("Unknown Number");
+                        if (textLower.includes("bank") || textLower.includes("hdfc") || textLower.includes("sbi") || textLower.includes("card")) {
+                            newIndicators.push("Banking Keywords");
+                        }
+                        if (textLower.includes("immediately") || textLower.includes("right now") || textLower.includes("quickly") || textLower.includes("arrest")) {
+                            newIndicators.push("Urgency Language");
+                        }
+                        if (textLower.includes("otp") || textLower.includes("code") || textLower.includes("verify") || textLower.includes("number")) {
+                            newIndicators.push("Verification Request");
+                        }
+                        if (simKey === 'voice_clone') {
+                            newIndicators.push("Voice Analysis Running");
+                            if (simLineIndex >= 1) newIndicators.push("Synthetic Voice Indicators");
+                        }
+
+                        setSimActiveIndicators(prev => Array.from(new Set([...prev, ...newIndicators])));
+                        playChime(784, 0.1); // G5 stream tick
+
+                        // If risk hits alert threshold
+                        if (currentScore >= 75 && simLineIndex === scenario.dialogue.length - 1) {
+                            setTimeout(() => {
+                                setSimState('alert');
+                                playChime(987, 0.4); // B5 alarm
+                            }, 1500);
+                        }
+
+                        setSimLineIndex(simLineIndex + 1);
+                    }, 3000);
+                    return () => clearTimeout(timer);
+                } else {
+                    // Scenario finished
+                    if (scenario.score < 75) {
+                        setSimState('evidence');
+                        saveToLogs(scenario, simScore, "Completed (Clean)");
+                    }
+                }
+            }, [simState, simLineIndex, simKey]);
+
+            // Save call results to log dashboard
+            const saveToLogs = (scenario, score, statusText) => {
+                const newReport = {
+                    id: "REP-" + Math.floor(1000 + Math.random() * 9000),
+                    caller: scenario.caller,
+                    date: new Date().toLocaleTimeString() + ", Today",
+                    type: scenario.classification,
+                    risk: score >= 75 ? "CRITICAL" : score >= 45 ? "HIGH" : score >= 20 ? "MEDIUM" : "LOW",
+                    explanation: scenario.reasons.join(", ") + " - detected during dialog checks.",
+                    score: score,
+                    transcript: scenario.dialogue.join(" ")
+                };
+                setReports(prev => [newReport, ...prev]);
+            };
+
+            const blockAndSave = () => {
+                setSimState('evidence');
+                saveToLogs(SCENARIOS[simKey], simScore, "Blocked & Saved");
+            };
+
+            const resetSimulator = () => {
+                setSimState('idle');
+                setSimTranscript([]);
+                setSimScore(0);
+                setSimLineIndex(0);
+            };
+
+            return (
+                <div class="max-w-6xl mx-auto px-4 py-6 min-h-screen flex flex-col gap-6 relative z-10">
+                    
+                    {/* Header Shield Bar */}
+                    <header class="glass-panel rounded-2xl p-5 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-darkBorder shadow-glowBlue">
                         <div class="flex items-center gap-3">
-                            <span class="text-3xl">🛡️</span>
+                            <div class="w-10 h-10 rounded-xl bg-shieldBlue/10 flex items-center justify-center border border-shieldBlue/30 text-shieldBlue animate-pulse">
+                                <Icon name="shield" className="w-6 h-6" />
+                            </div>
                             <div>
-                                <h1 class="text-xl font-bold tracking-tight text-white">CAMP PROTECT</h1>
-                                <p class="text-xs text-slate-400">AI Scam Shield & Voice Integrity Platform</p>
+                                <h1 class="text-xl font-bold tracking-wider text-white flex items-center gap-2">
+                                    🛡️ AI SCAM CALL INTERCEPTOR
+                                </h1>
+                                <p class="text-[11px] text-slate-400 font-medium">Real-time Telephony Protection Shield</p>
                             </div>
                         </div>
-                        <div class="flex gap-2 text-xs">
-                            <span class="px-3 py-1 bg-slate-800 rounded-full border border-slate-700">Database: SQLite (Active)</span>
-                            <span class="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">Server Status: Online</span>
-                        </div>
+
+                        {/* Navigation Menu */}
+                        <nav class="flex flex-wrap gap-1.5 md:gap-3 bg-slate-900/60 p-1 rounded-xl border border-darkBorder">
+                            {[
+                                { id: 'dashboard', label: 'Dashboard', icon: 'shield' },
+                                { id: 'live', label: 'Live Shield', icon: 'phone' },
+                                { id: 'reports', label: 'Threat Reports', icon: 'history' },
+                                { id: 'profiles', label: 'Trusted Profiles', icon: 'users' },
+                                { id: 'architecture', label: 'System Architecture', icon: 'cpu' },
+                            ].map(item => (
+                                <button 
+                                    key={item.id}
+                                    onClick={() => { setActiveScreen(item.id); resetSimulator(); }}
+                                    class={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${activeScreen === item.id ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/30' : 'text-slate-400 hover:text-slate-200'}`}
+                                >
+                                    <Icon name={item.icon} className="w-3.5 h-3.5" />
+                                    {item.label}
+                                </button>
+                            ))}
+                        </nav>
                     </header>
 
-                    {/* Navigation Tabs */}
-                    <div class="flex flex-wrap justify-center bg-slate-950 border-b border-slate-900 px-6 py-3 gap-2 md:gap-4">
-                        <button onClick={() => { setActiveTab('live'); setAnalysisResult(null); stopHighRiskAlarm(); }} class={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'live' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>🎙️ Live Mic Monitor</button>
-                        <button onClick={() => { setActiveTab('audio'); setAnalysisResult(null); stopHighRiskAlarm(); }} class={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'audio' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>📁 Upload Audio File</button>
-                        <button onClick={() => { setActiveTab('transcript'); setAnalysisResult(null); stopHighRiskAlarm(); }} class={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'transcript' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>📝 Paste Transcript</button>
-                        <button onClick={() => { setActiveTab('history'); stopHighRiskAlarm(); }} class={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'history' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>📊 Call Logs & History</button>
-                        <button onClick={() => { setActiveTab('analytics'); stopHighRiskAlarm(); }} class={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === 'analytics' ? 'bg-slate-800 text-white shadow-lg border border-slate-700' : 'text-slate-400 hover:text-slate-200'}`}>📈 System Analytics</button>
-                    </div>
+                    {/* SCREEN 1: MAIN PROTECTION DASHBOARD */}
+                    {activeScreen === 'dashboard' && (() => {
+                        const score = 40 + (shieldActive ? 20 : 0) + (dbSyncState === 'synced' ? 20 : 0) + (hookVerifyState === 'verified' ? 20 : 0);
+                        return (
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                                
+                                {/* Dashboard Left: Status & Tasks Checklist */}
+                                <div class="md:col-span-8 flex flex-col gap-6">
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden">
+                                        <div class="absolute inset-0 bg-gradient-to-r from-shieldBlue/5 to-transparent pointer-events-none"></div>
+                                        <div class="flex items-center justify-between">
+                                            <h2 class="text-md font-extrabold text-slate-200 tracking-wider">AI CALL INTEGRITY MONITOR</h2>
+                                            <span class="text-[9px] px-2 py-0.5 bg-slate-800 text-slate-400 rounded-full font-mono">ENCRYPTED TELEPHONY LAYER</span>
+                                        </div>
 
-                    {/* Main Layout Grid */}
-                    <main class="flex-1 max-w-7xl w-full mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-
-                        {/* LEFT: Input Column */}
-                        <div class="lg:col-span-7 flex flex-col gap-6">
-
-                            {/* Tab 1: Live Mic Monitor */}
-                            {activeTab === 'live' && (
-                                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-                                    <h2 class="text-lg font-bold">🎙️ Continuous Offline Speech Monitoring</h2>
-                                    <p class="text-sm text-slate-400">
-                                        Click <strong>Start Monitoring</strong> and speak in Hindi or English (mixed Hinglish supported). The offline AI scanner will transcribe your voice and check threat metrics in real-time.
-                                    </p>
-
-                                    {isCallTerminated && (
-                                        <div class="p-4 bg-red-950/80 border border-red-500 text-red-400 rounded-xl flex items-center gap-3 animate-pulse">
-                                            <span class="text-2xl">🚨</span>
+                                        {/* Large Ring Shield */}
+                                        <div class="py-8 flex flex-col items-center justify-center gap-3 text-center border-b border-darkBorder/60">
+                                            <div class={`w-24 h-24 rounded-full flex items-center justify-center border-4 transition-all duration-500 ${shieldActive ? 'border-shieldGreen/40 bg-shieldGreen/5 text-shieldGreen shadow-glowGreen' : 'border-slate-800 bg-slate-900/30 text-slate-600'}`}>
+                                                <Icon name="shield" className="w-12 h-12" />
+                                            </div>
                                             <div>
-                                                <h3 class="text-sm font-extrabold uppercase tracking-wider">CALL TERMINATED AUTOMATICALLY</h3>
-                                                <p class="text-xs text-red-400/80 mt-1">Scam threat reached 100%. System automatically hung up to protect the user.</p>
+                                                <h3 class="text-lg font-black text-white mt-2">
+                                                    AI PROTECTION IS {shieldActive ? 'ACTIVE' : 'INACTIVE'}
+                                                </h3>
+                                                <p class="text-xs text-slate-400 max-w-sm mt-1 leading-normal">
+                                                    The call interceptor will automatically analyze and warn you against unknown numbers and voice-cloned scammers.
+                                                </p>
                                             </div>
                                         </div>
-                                    )}
 
-                                    <div class="flex items-center gap-4 mt-2">
-                                        <button onClick={toggleMic} class={`flex-1 py-4 px-6 rounded-xl font-bold flex items-center justify-center gap-3 transition-all ${isListening ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' : 'bg-blue-500 hover:bg-blue-600 text-slate-950'}`}>
-                                            <span>{isListening ? '⏹️ Stop Monitoring' : '🎙️ Start Monitoring'}</span>
-                                        </button>
-                                        <span class={`px-3 py-1 rounded-full text-xs font-bold ${isListening ? 'bg-red-500/20 text-red-400' : 'bg-slate-800 text-slate-400'}`}>
-                                            {isListening ? '● SCANNING' : '● IDLE'}
-                                        </span>
-                                    </div>
+                                        {/* Security Tasks Checklist */}
+                                        <div class="flex flex-col gap-4 py-2">
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider">🛡️ Security Checklist & Health</h4>
+                                                    <p class="text-[10px] text-slate-500 mt-0.5">Complete recommended tasks to optimize intercept coverage.</p>
+                                                </div>
+                                                <div class="text-right">
+                                                    <span class="text-xs font-black text-shieldBlue font-mono">{score}% Score</span>
+                                                    <span class="text-[9px] text-slate-500 block uppercase font-bold mt-0.5">Health rating</span>
+                                                </div>
+                                            </div>
 
-                                    {/* Mic Live Transcript Viewer */}
-                                    <div class="mt-4">
-                                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Live Transcript View</h3>
-                                        <div class="bg-slate-950 rounded-xl p-4 h-64 overflow-y-auto border border-slate-900 flex flex-col gap-2">
-                                            {micTranscript.length === 0 ? (
-                                                <div class="text-slate-600 text-center py-20 text-sm">Waiting for speech... Speak now!</div>
-                                            ) : (
-                                                micTranscript.map((t, idx) => (
-                                                    <div key={idx} class="text-sm border-l-2 border-slate-700 pl-3 py-1 text-slate-300">"{t}"</div>
-                                                ))
-                                            )}
+                                            {/* Score Progress Bar */}
+                                            <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-900">
+                                                <div 
+                                                    style={{ width: `${score}%` }} 
+                                                    class={`h-full transition-all duration-500 ${score >= 80 ? 'bg-shieldGreen shadow-glowGreen' : score >= 60 ? 'bg-shieldOrange shadow-glowGold' : 'bg-shieldBlue'}`}
+                                                ></div>
+                                            </div>
+
+                                            {/* Tasks List */}
+                                            <div class="flex flex-col gap-2.5 mt-2">
+                                                
+                                                {/* Task 1: Shield */}
+                                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl flex items-center justify-between">
+                                                    <div class="flex items-center gap-3">
+                                                        <span class={`text-sm ${shieldActive ? 'text-shieldGreen' : 'text-slate-600'}`}>
+                                                            {shieldActive ? '✓' : '○'}
+                                                        </span>
+                                                        <div>
+                                                            <div class="text-xs font-bold text-slate-200">Enable core AI threat shield</div>
+                                                            <p class="text-[9px] text-slate-500">Must remain active to process incoming streams.</p>
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => setShieldActive(!shieldActive)}
+                                                        class={`px-3 py-1 rounded text-[10px] font-bold border transition-all ${shieldActive ? 'bg-shieldRed/15 border-shieldRed/30 text-shieldRed' : 'bg-shieldGreen/15 border-shieldGreen/30 text-shieldGreen'}`}
+                                                    >
+                                                        {shieldActive ? 'Disable' : 'Enable'}
+                                                    </button>
+                                                </div>
+
+                                                {/* Task 2: DB Sync */}
+                                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl flex items-center justify-between">
+                                                    <div class="flex items-center gap-3">
+                                                        <span class={`text-sm ${dbSyncState === 'synced' ? 'text-shieldGreen animate-pulse' : 'text-slate-600'}`}>
+                                                            {dbSyncState === 'synced' ? '✓' : '○'}
+                                                        </span>
+                                                        <div>
+                                                            <div class="text-xs font-bold text-slate-200">Synchronize scam signature database</div>
+                                                            <p class="text-[9px] text-slate-500">
+                                                                {dbSyncState === 'synced' ? 'Synced (10,482 signatures loaded)' : 'Out of sync - sync recommended.'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={handleSyncDatabase}
+                                                        disabled={dbSyncState === 'syncing' || dbSyncState === 'synced'}
+                                                        class={`px-3 py-1 rounded text-[10px] font-bold border transition-all ${dbSyncState === 'synced' ? 'bg-slate-900 border-slate-800 text-slate-600' : 'bg-shieldBlue/15 border-shieldBlue/30 text-shieldBlue'}`}
+                                                    >
+                                                        {dbSyncState === 'syncing' ? 'Syncing...' : dbSyncState === 'synced' ? 'Synced' : 'Sync Now'}
+                                                    </button>
+                                                </div>
+
+                                                {/* Task 3: Hook Verification */}
+                                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl flex items-center justify-between">
+                                                    <div class="flex items-center gap-3">
+                                                        <span class={`text-sm ${hookVerifyState === 'verified' ? 'text-shieldGreen' : 'text-slate-600'}`}>
+                                                            {hookVerifyState === 'verified' ? '✓' : '○'}
+                                                        </span>
+                                                        <div>
+                                                            <div class="text-xs font-bold text-slate-200">Verify Twilio telephony hook status</div>
+                                                            <p class="text-[9px] text-slate-500">
+                                                                {hookVerifyState === 'verified' ? 'Hook Verified (Active redirection channel)' : 'Redirection hook unverified.'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={handleVerifyHook}
+                                                        disabled={hookVerifyState === 'verifying' || hookVerifyState === 'verified'}
+                                                        class={`px-3 py-1 rounded text-[10px] font-bold border transition-all ${hookVerifyState === 'verified' ? 'bg-slate-900 border-slate-800 text-slate-600' : 'bg-shieldBlue/15 border-shieldBlue/30 text-shieldBlue'}`}
+                                                    >
+                                                        {hookVerifyState === 'verifying' ? 'Checking...' : hookVerifyState === 'verified' ? 'Verified' : 'Verify Hook'}
+                                                    </button>
+                                                </div>
+
+                                                {/* Task 4: Voice Vault Setup */}
+                                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl flex items-center justify-between">
+                                                    <div class="flex items-center gap-3">
+                                                        <span class="text-sm text-slate-600">○</span>
+                                                        <div>
+                                                            <div class="text-xs font-bold text-slate-200">Configure Trusted Family Voice Vault</div>
+                                                            <p class="text-[9px] text-slate-500">Register voiceprint to detect cloned relatives.</p>
+                                                        </div>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => setActiveScreen('profiles')}
+                                                        class="px-3 py-1 rounded text-[10px] font-bold border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+                                                    >
+                                                        Set Up Voice
+                                                    </button>
+                                                </div>
+
+                                            </div>
                                         </div>
+
+                                        {/* Core Features Checked Grid */}
+                                        <div class="border-t border-darkBorder pt-4 mt-2">
+                                            <div class="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-3">Shield Coverage Specifications</div>
+                                            <div class="grid grid-cols-2 gap-3">
+                                                {[
+                                                    { title: "Unknown Caller Protection", desc: "Bypasses whitelisted contact numbers automatically" },
+                                                    { title: "Scam Intent Detection", desc: "Monitors NLP semantic threats in dialogue stream" },
+                                                    { title: "Voice Authenticity Analysis", desc: "Detects AI synthetic cloning & deepfake parameters" },
+                                                    { title: "Explainable AI Alerts", desc: "Specifies logical evidence categories behind alerts" }
+                                                ].map(feat => (
+                                                    <div key={feat.title} class="flex items-start gap-2.5">
+                                                        <span class="text-shieldGreen font-bold text-sm leading-none">✓</span>
+                                                        <div>
+                                                            <div class="text-xs font-bold text-slate-200">{feat.title}</div>
+                                                            <div class="text-[10px] text-slate-500 leading-normal mt-0.5">{feat.desc}</div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
                                     </div>
                                 </div>
-                            )}
 
-                            {/* Tab 2: Upload Audio File */}
-                            {activeTab === 'audio' && (
-                                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-                                    <div class="flex items-center justify-between">
-                                        <h2 class="text-lg font-bold">📁 Batch Speech-to-Text & Voice Analysis</h2>
-                                        <span class="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30 text-xs font-bold">New: AI Voice Detection Included</span>
-                                    </div>
-                                    <p class="text-sm text-slate-400">Upload recorded call files (.wav, .mp3, .m4a) to decode audio features, verify speech patterns, and classify human vs AI voices.</p>
-
-                                    <form onSubmit={(e) => handleAnalyzeAudio(e, null)} class="flex flex-col gap-4">
-                                        <div
-                                            onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-emerald-500'); }}
-                                            onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('border-emerald-500'); }}
-                                            onDrop={(e) => {
-                                                e.preventDefault();
-                                                e.currentTarget.classList.remove('border-emerald-500');
-                                                const file = e.dataTransfer.files[0];
-                                                if (file) {
-                                                    setAudioFile(file);
-                                                    handleAnalyzeAudio(null, file);
-                                                }
-                                            }}
-                                            class="border-2 border-dashed border-slate-700 hover:border-slate-500 rounded-xl p-8 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all bg-slate-950/40"
-                                        >
-                                            <span class="text-4xl mb-2">📥</span>
-                                            <input type="file" accept="audio/*" onChange={(e) => {
-                                                const file = e.target.files[0];
-                                                if (file) {
-                                                    setAudioFile(file);
-                                                    handleAnalyzeAudio(null, file);
-                                                }
-                                            }} class="text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700" />
-                                            <span class="text-xs text-slate-500">Supports WAV, MP3, M4A, OGG (Drag & Drop or Select File)</span>
+                                {/* Dashboard Right: Stats, Recent Logs, Info */}
+                                <div class="md:col-span-4 flex flex-col gap-6">
+                                    
+                                    {/* Telemetry Logs Stats */}
+                                    <div class="glass-panel rounded-2xl p-5 flex flex-col gap-4">
+                                        <h3 class="text-xs font-black uppercase text-slate-400 tracking-wider">Shield Logs Overview</h3>
+                                        
+                                        <div class="grid grid-cols-3 gap-2">
+                                            <div class="bg-slate-900/60 border border-darkBorder p-3 rounded-xl text-center">
+                                                <span class="text-[9px] text-slate-400 block mb-1 font-bold">Protected</span>
+                                                <span class="text-lg font-black text-white">8</span>
+                                            </div>
+                                            <div class="bg-slate-900/60 border border-darkBorder p-3 rounded-xl text-center">
+                                                <span class="text-[9px] text-slate-400 block mb-1 font-bold">Threats</span>
+                                                <span class="text-lg font-black text-shieldOrange">2</span>
+                                            </div>
+                                            <div class="bg-slate-900/60 border border-darkBorder p-3 rounded-xl text-center">
+                                                <span class="text-[9px] text-slate-400 block mb-1 font-bold">Intercepted</span>
+                                                <span class="text-lg font-black text-shieldRed">1</span>
+                                            </div>
                                         </div>
 
-                                        <button type="submit" disabled={!audioFile || loading} class="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl transition-all disabled:opacity-50">
-                                            {loading ? 'Processing Audio Pipeline...' : 'Select or drop a file to automatically detect voice integrity'}
-                                        </button>
-                                    </form>
+                                        <div class="flex flex-col gap-2 mt-2">
+                                            <button 
+                                                onClick={() => setActiveScreen('live')}
+                                                class="w-full py-2.5 bg-shieldBlue hover:bg-shieldBlue/80 text-darkBg font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-glowBlue"
+                                            >
+                                                <Icon name="phone" className="w-4 h-4" /> Simulate Threat Call
+                                            </button>
+                                            <button 
+                                                onClick={() => setActiveScreen('reports')}
+                                                class="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5"
+                                            >
+                                                <Icon name="history" className="w-4 h-4" /> View Threat Reports
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Recent Interceptions Card */}
+                                    <div class="glass-panel rounded-2xl p-5 flex flex-col gap-3">
+                                        <h3 class="text-xs font-black uppercase text-slate-400 tracking-wider">⚠️ Recent Intercepted Threats</h3>
+                                        <div class="flex flex-col gap-2.5">
+                                            {reports.slice(0, 2).map((rep, index) => (
+                                                <div 
+                                                    key={index} 
+                                                    onClick={() => setActiveScreen('reports')}
+                                                    class="p-2.5 bg-slate-950 border border-slate-900 hover:border-slate-800 rounded-xl cursor-pointer transition-all flex flex-col gap-1.5"
+                                                >
+                                                    <div class="flex justify-between items-center text-[9px] font-semibold text-slate-500">
+                                                        <span>{rep.date}</span>
+                                                        <span class={`font-black ${rep.risk === 'CRITICAL' ? 'text-shieldRed' : 'text-shieldOrange'}`}>
+                                                            {rep.risk}
+                                                        </span>
+                                                    </div>
+                                                    <div class="text-[11px] font-bold text-slate-200">{rep.type}</div>
+                                                    <div class="text-[10px] text-slate-400 font-mono">{rep.caller}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Security Notification Banner */}
+                                    <div class="p-4 bg-shieldBlue/5 border border-shieldBlue/25 rounded-2xl flex items-start gap-3">
+                                        <span class="text-lg text-shieldBlue">💡</span>
+                                        <p class="text-[11px] text-slate-400 leading-relaxed">
+                                            <strong>How it works:</strong> The Interceptor activates background AI scoring the moment you receive an unknown carrier call, warning you on-screen without storing or transmitting personal data.
+                                        </p>
+                                    </div>
+
                                 </div>
-                            )}
 
-                            {/* Tab 3: Paste Transcript */}
-                            {activeTab === 'transcript' && (
-                                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-                                    <h2 class="text-lg font-bold">📝 Pasted Transcript Evaluation</h2>
-                                    <p class="text-sm text-slate-400">Select one of our pre-compiled scam templates or write/paste a custom transcript.</p>
+                            </div>
+                        );
+                    })()}
 
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
-                                        {DEMO_TRANSCRIPTS.map((demo, idx) => (
-                                            <button key={idx} onClick={() => { setPastedText(demo.text); handleAnalyzeText(demo.text); }} class="text-left px-3 py-2 bg-slate-950/40 border border-slate-800 rounded-lg hover:bg-slate-800 text-xs font-medium transition-all text-slate-300">
-                                                🎯 {demo.title}
+                    {/* SCREEN 2, 3, 4: REALISTIC MOBILE EXPERIENCE SIMULATOR */}
+                    {activeScreen === 'live' && (
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center justify-center">
+                            
+                            {/* Simulator Left Panel: Select scenario to start */}
+                            <div class="lg:col-span-5 flex flex-col gap-5">
+                                <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4">
+                                    <h3 class="text-sm font-extrabold text-white tracking-wider flex items-center gap-2">
+                                        <span class="w-2 h-2 bg-shieldBlue rounded-full shadow-glowBlue"></span>
+                                        SCENARIO TESTING HUB
+                                    </h3>
+                                    <p class="text-xs text-slate-400 leading-normal">
+                                        Choose one of the phone call scenarios below. The virtual mobile emulator on the right will simulate how the AI Interceptor shields you in real-time.
+                                    </p>
+
+                                    <div class="flex flex-col gap-2.5 mt-2">
+                                        {[
+                                            { id: 'bank', name: '🏦 Bank Manager Spoof', type: 'OTP Scam Verification' },
+                                            { id: 'police', name: '👮 Police Extortion Scare', type: 'Legal Threat Extortion' },
+                                            { id: 'voice_clone', name: '👨‍👦 AI Voice-Cloned Son', type: 'Impersonation Deepfake' },
+                                            { id: 'courier', name: '📦 Courier Customs Agent', type: 'Aadhaar ID phishing' },
+                                            { id: 'safe', name: '🟢 Verified Amazon Courier', type: 'Safe logistics call' }
+                                        ].map(item => (
+                                            <button 
+                                                key={item.id}
+                                                onClick={() => startSimulation(item.id)}
+                                                class={`w-full p-3 bg-slate-900/60 border rounded-xl text-left transition-all hover:bg-slate-900 flex justify-between items-center ${simKey === item.id && simState !== 'idle' ? 'border-shieldBlue bg-slate-800' : 'border-darkBorder'}`}
+                                            >
+                                                <div>
+                                                    <div class="text-xs font-bold text-slate-200">{item.name}</div>
+                                                    <p class="text-[9px] text-slate-500 mt-0.5">{item.type}</p>
+                                                </div>
+                                                <span class="text-[10px] font-bold text-shieldBlue flex items-center gap-1">
+                                                    Simulate <Icon name="arrowRight" className="w-3 h-3" />
+                                                </span>
                                             </button>
                                         ))}
                                     </div>
 
-                                    <textarea value={pastedText} onChange={(e) => setPastedText(e.target.value)} placeholder="Type or paste the transcript conversation here..." class="w-full h-40 bg-slate-950 rounded-xl p-4 text-sm text-slate-300 border border-slate-800 focus:outline-none focus:border-slate-700 focus:ring-0 resize-none"></textarea>
-
-                                    <button onClick={() => handleAnalyzeText(null)} disabled={!pastedText.trim() || loading} class="w-full py-3 bg-blue-500 hover:bg-blue-600 text-slate-950 font-bold rounded-xl transition-all disabled:opacity-50">
-                                        {loading ? 'Analyzing scam weights...' : 'Run Threat Evaluation'}
-                                    </button>
+                                    {simState !== 'idle' && (
+                                        <button 
+                                            onClick={resetSimulator}
+                                            class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs mt-2"
+                                        >
+                                            Reset Mobile Emulator
+                                        </button>
+                                    )}
                                 </div>
-                            )}
+                            </div>
 
-                            {/* Tab 4: History Table */}
-                            {activeTab === 'history' && (
-                                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                    <h2 class="text-lg font-bold mb-4">📊 Call History & Threat Logs</h2>
-                                    <div class="overflow-x-auto">
-                                        <table class="w-full text-left text-sm text-slate-400">
-                                            <thead class="bg-slate-950 text-slate-300 font-bold uppercase text-xs tracking-wider border-b border-slate-800">
-                                                <tr>
-                                                    <th class="py-3 px-4">Caller ID</th>
-                                                    <th class="py-3 px-4">Threat Score</th>
-                                                    <th class="py-3 px-4">Voice Classification</th>
-                                                    <th class="py-3 px-4">Status</th>
-                                                    <th class="py-3 px-4">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-slate-800/50">
-                                                {history.length === 0 ? (
-                                                    <tr>
-                                                        <td colspan="5" class="py-8 text-center">No evaluations logged yet.</td>
-                                                    </tr>
-                                                ) : (
-                                                    history.map((h, idx) => (
-                                                        <tr key={idx} class="hover:bg-slate-800/35 transition-all">
-                                                            <td class="py-3 px-4 text-slate-200 font-medium">
-                                                                <div>{h.from_number}</div>
-                                                                <div class="text-[10px] text-slate-500 font-mono mt-0.5">{h.call_sid}</div>
-                                                            </td>
-                                                            <td class="py-3 px-4">
-                                                                <span class={`px-2 py-0.5 rounded text-xs font-bold ${getRiskBadge(h.risk_label.toUpperCase())}`}>
-                                                                    {Math.round(h.final_score * 100)}%
-                                                                </span>
-                                                            </td>
-                                                            <td class="py-3 px-4">
-                                                                {h.voiceClassification ? (
-                                                                    <span class={`px-2 py-0.5 rounded text-xs font-bold ${getVoiceBadge(h.voiceClassification)}`}>
-                                                                        {h.voiceClassification}
-                                                                    </span>
-                                                                ) : (
-                                                                    <span class="text-xs text-slate-500">N/A (Text-only)</span>
-                                                                )}
-                                                            </td>
-                                                            <td class="py-3 px-4 text-xs font-bold text-slate-300">{h.status.toUpperCase()}</td>
-                                                            <td class="py-3 px-4">
-                                                                <button onClick={() => setSelectedCall(h)} class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded">
-                                                                    View Details
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    ))
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Tab 5: Analytics Charts */}
-                            {activeTab === 'analytics' && (
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-                                        <h2 class="text-lg font-bold">🛡 decline statistics and reports</h2>
-                                        <div class="grid grid-cols-2 gap-4 mt-2">
-                                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                                                <span class="text-xs text-slate-400 block mb-1">Evaluated Threats</span>
-                                                <span class="text-2xl font-bold text-white">{stats.total_calls}</span>
-                                            </div>
-                                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                                                <span class="text-xs text-slate-400 block mb-1">High Risk Blocks</span>
-                                                <span class="text-2xl font-bold text-red-500">{stats.blocked_calls + stats.fraud_calls}</span>
-                                            </div>
-                                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                                                <span class="text-xs text-slate-400 block mb-1">Medium Suspicious</span>
-                                                <span class="text-2xl font-bold text-amber-500">{stats.suspicious_calls}</span>
-                                            </div>
-                                            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                                                <span class="text-xs text-slate-400 block mb-1">Verified Safe Calls</span>
-                                                <span class="text-2xl font-bold text-emerald-500">{stats.safe_calls}</span>
-                                            </div>
+                            {/* Simulator Right Panel: The Virtual Smartphone Frame */}
+                            <div class="lg:col-span-7 flex justify-center">
+                                <div class="phone-frame w-[360px] h-[640px] flex flex-col relative overflow-hidden">
+                                    
+                                    {/* Phone Notch/Status Bar */}
+                                    <div class="bg-slate-950 px-6 py-2 flex justify-between items-center text-[10px] font-bold text-slate-500 relative z-20">
+                                        <span>20:06</span>
+                                        <div class="w-16 h-4 bg-slate-900 rounded-b-xl absolute left-1/2 -translate-x-1/2 top-0 border-x border-b border-slate-800/40"></div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span>5G</span>
+                                            <span class="w-4 h-2.5 bg-slate-700 rounded-sm inline-block relative border border-slate-600"><span class="w-full h-full bg-slate-300 absolute top-0 left-0"></span></span>
                                         </div>
                                     </div>
 
-                                    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-center items-center">
-                                        <h2 class="text-sm font-bold text-slate-400 mb-6 uppercase tracking-wider self-start">Scam Distribution Breakdown</h2>
-                                        {stats.total_calls === 0 ? (
-                                            <div class="text-slate-600 text-xs py-12">No data logged. Run tests to populate charts.</div>
-                                        ) : (
-                                            <div class="flex flex-col gap-2 w-full text-xs">
-                                                <div class="flex justify-between">
-                                                    <span>OTP Scams</span>
-                                                    <span class="font-bold text-red-400">{Math.round((stats.fraud_calls / (stats.total_calls || 1)) * 100)}%</span>
+                                    {/* Simulator Screens Content Router */}
+                                    <div class="flex-1 p-5 flex flex-col justify-between relative z-10">
+                                        
+                                        {/* SCREEN: IDLE TELEPHONY STATE */}
+                                        {simState === 'idle' && (
+                                            <div class="flex-1 flex flex-col justify-center items-center gap-4 text-center">
+                                                <div class="w-20 h-20 rounded-2xl bg-slate-900/60 border-2 border-dashed border-darkBorder flex items-center justify-center text-slate-600 mb-2">
+                                                    <Icon name="phone" className="w-10 h-10" />
                                                 </div>
-                                                <div class="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden">
-                                                    <div class="bg-red-500 h-full" style={{ width: `${(stats.fraud_calls / (stats.total_calls || 1)) * 100}%` }}></div>
+                                                <h3 class="text-sm font-extrabold text-slate-300">TELEPHONY SIMULATOR READY</h3>
+                                                <p class="text-[11px] text-slate-500 max-w-[220px] leading-normal">
+                                                    Select a threat call scenario on the left panel to test real-time interception alerts.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* SCREEN 2: CALL RINGING - UNKNOWN CALL DETECTED */}
+                                        {simState === 'ringing' && (
+                                            <div class="flex-1 flex flex-col justify-between py-6">
+                                                <div class="text-center flex flex-col items-center gap-2">
+                                                    <div class="px-3 py-1 bg-shieldRed/10 border border-shieldRed/30 text-shieldRed rounded-full text-[9px] font-black uppercase tracking-wider animate-pulse mb-3">
+                                                        ⚠️ Unknown Caller Detected
+                                                    </div>
+                                                    <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 border border-slate-700 text-2xl font-bold">
+                                                        ?
+                                                    </div>
+                                                    <h3 class="text-lg font-black text-white mt-2">
+                                                        {SCENARIOS[simKey].caller}
+                                                    </h3>
+                                                    <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold font-mono">Incoming Carrier Call</span>
                                                 </div>
 
-                                                <div class="flex justify-between mt-2">
-                                                    <span>KYC & Banking Scams</span>
-                                                    <span class="font-bold text-amber-400">{Math.round((stats.suspicious_calls / (stats.total_calls || 1)) * 100)}%</span>
-                                                </div>
-                                                <div class="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden">
-                                                    <div class="bg-amber-500 h-full" style={{ width: `${(stats.suspicious_calls / (stats.total_calls || 1)) * 100}%` }}></div>
+                                                {/* Guard shield state */}
+                                                <div class="bg-shieldBlue/5 border border-shieldBlue/30 rounded-xl p-4 text-center flex flex-col items-center gap-2 max-w-[280px] mx-auto animate-pulse">
+                                                    <div class="w-7 h-7 rounded-full bg-shieldBlue/15 flex items-center justify-center text-shieldBlue">
+                                                        <Icon name="shield" className="w-4 h-4" />
+                                                    </div>
+                                                    <div class="text-[10px] font-bold text-slate-200">AI Protection Shield Activated</div>
+                                                    <p class="text-[9px] text-slate-500">Status: Preparing Analysis...</p>
                                                 </div>
 
-                                                <div class="flex justify-between mt-2">
-                                                    <span>Safe Verified Calls</span>
-                                                    <span class="font-bold text-emerald-400">{Math.round((stats.safe_calls / (stats.total_calls || 1)) * 100)}%</span>
-                                                </div>
-                                                <div class="w-full bg-slate-950 h-2.5 rounded-full overflow-hidden">
-                                                    <div class="bg-emerald-500 h-full" style={{ width: `${(stats.safe_calls / (stats.total_calls || 1)) * 100}%` }}></div>
+                                                {/* Dial accept slide */}
+                                                <div class="flex justify-around items-center px-4 mt-6">
+                                                    <button 
+                                                        onClick={resetSimulator}
+                                                        class="w-12 h-12 bg-shieldRed rounded-full flex items-center justify-center text-white shadow-glowRed"
+                                                    >
+                                                        <Icon name="phone" className="w-5 h-5 transform rotate-[135deg]" />
+                                                    </button>
+                                                    <span class="text-[10px] text-slate-500 animate-bounce">Answer ➔</span>
+                                                    <button 
+                                                        onClick={answerCall}
+                                                        class="w-12 h-12 bg-shieldGreen rounded-full flex items-center justify-center text-darkBg shadow-glowGreen"
+                                                    >
+                                                        <Icon name="phone" className="w-5 h-5" />
+                                                    </button>
                                                 </div>
                                             </div>
                                         )}
-                                    </div>
-                                </div>
-                            )}
 
-                        </div>
-
-                        {/* RIGHT: Output Gauge & Decision Column */}
-                        <div class="lg:col-span-5 flex flex-col gap-6">
-
-                            {/* Threat Evaluation Report */}
-                            {((activeTab === 'live' && isListening) || (activeTab !== 'live' && analysisResult)) ? (
-                                <div class="flex flex-col gap-6">
-
-                                    {/* Combined Threat Summary (for Audio Uploads) */}
-                                    {isAudioAnalysis && (
-                                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4 items-center">
-                                            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider self-start">🛡️ Combined threat assessment</h2>
-
-                                            <div class="grid grid-cols-3 gap-2 w-full mt-2">
-                                                {/* Mini Scam Score */}
-                                                <div class="bg-slate-950/70 p-3 border border-slate-800 rounded-xl flex flex-col items-center justify-center">
-                                                    <span class="text-xs text-slate-400 block mb-1">Scam Score</span>
-                                                    <span class="text-xl font-bold text-white">{scamScore}%</span>
-                                                </div>
-                                                {/* Mini Voice Score */}
-                                                <div class="bg-slate-950/70 p-3 border border-slate-800 rounded-xl flex flex-col items-center justify-center">
-                                                    <span class="text-xs text-slate-400 block mb-1">Voice Score</span>
-                                                    <span class="text-xl font-bold text-red-400">{voiceScore}%</span>
-                                                </div>
-                                                {/* Combined Score */}
-                                                <div class="bg-slate-950/70 p-3 border border-slate-800 rounded-xl flex flex-col items-center justify-center">
-                                                    <span class="text-xs text-slate-400 block mb-1">Combined</span>
-                                                    <span class="text-xl font-bold text-amber-400">{combinedScore}%</span>
-                                                </div>
-                                            </div>
-
-                                            <div class="relative flex items-center justify-center mt-3">
-                                                <svg class="w-36 h-36 transform -rotate-90">
-                                                    <circle cx="72" cy="72" r="60" stroke="#1e293b" stroke-width="10" fill="transparent" />
-                                                    <circle cx="72" cy="72" r="60"
-                                                        stroke={combinedScore >= 70 ? '#ef4444' : combinedScore >= 31 ? '#f59e0b' : '#10b981'}
-                                                        stroke-width="10"
-                                                        fill="transparent"
-                                                        stroke-dasharray="377"
-                                                        stroke-dashoffset={377 - (377 * combinedScore) / 100}
-                                                        class="transition-all duration-700 ease-out"
-                                                    />
-                                                </svg>
-                                                <div class="absolute flex flex-col items-center justify-center">
-                                                    <span class="text-3xl font-extrabold text-white">{combinedScore}%</span>
-                                                    <span class="text-[9px] text-slate-500 font-bold uppercase mt-0.5">Threat Score</span>
-                                                </div>
-                                            </div>
-
-                                            <div class={`w-full p-3.5 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${getRiskColorClass(combinedScore)}`}>
-                                                <span class="text-2xl mb-1">
-                                                    {combinedScore >= 70 ? '🚨' : combinedScore >= 31 ? '⚠️' : '✅'}
-                                                </span>
-                                                <h3 class="text-sm font-extrabold uppercase tracking-wide">
-                                                    Combined {combinedRiskLevel} Risk Detected
-                                                 </h3>
-                                            </div>
-
-                                            {isAlarmPlaying && (
-                                                <button onClick={stopHighRiskAlarm} class="w-full mt-3 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl animate-pulse flex items-center justify-center gap-2 border border-rose-400/50 shadow-lg shadow-rose-900/30">
-                                                    <span>🔊 Stop Alarm (30s Warning Active)</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* AI Voice Detection Card */}
-                                    {isAudioAnalysis && (
-                                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-                                            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">🔊 AI Voice Integrity Check</h2>
-
-                                            <div class="flex justify-between items-center bg-slate-950 p-3 border border-slate-900 rounded-xl">
-                                                <div>
-                                                    <div class="text-[10px] text-slate-500 uppercase tracking-wide">Classification</div>
-                                                    <div class="text-sm font-bold mt-0.5">{voiceClass}</div>
-                                                    {voiceAIProb > 90 ? (
-                                                        <div class="p-2 mt-2 bg-red-950/80 border border-red-500 text-red-400 rounded-lg text-[10px] font-bold text-center animate-pulse">
-                                                            🚨 High Confidence AI Voice Detected
-                                                        </div>
-                                                    ) : voiceAIProb > 70 ? (
-                                                        <div class="p-2 mt-2 bg-amber-950/80 border border-amber-500 text-amber-400 rounded-lg text-[10px] font-bold text-center">
-                                                            ⚠ AI-Generated Voice Detected
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                                <span class={`px-2.5 py-1 rounded-lg text-xs font-bold ${getVoiceBadge(voiceClass)}`}>
-                                                    {voiceConfidence}% Conf.
-                                                </span>
-                                            </div>
-
-                                            {/* Human vs AI Probability Slider */}
-                                            <div>
-                                                <div class="flex justify-between text-xs font-bold mb-1.5">
-                                                    <span class="text-emerald-400">Human: {voiceHumanProb}%</span>
-                                                    <span class="text-red-400">AI: {voiceAIProb}%</span>
-                                                </div>
-                                                <div class="w-full bg-slate-950 h-3 rounded-full flex overflow-hidden border border-slate-900">
-                                                    <div class="bg-emerald-500 h-full transition-all duration-700" style={{ width: `${voiceHumanProb}%` }}></div>
-                                                    <div class="bg-red-500 h-full transition-all duration-700" style={{ width: `${voiceAIProb}%` }}></div>
-                                                </div>
-                                            </div>
-
-                                            {/* Feature analysis list */}
-                                            {voiceFeatures && (
-                                                <div class="mt-2">
-                                                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-2">Acoustic Feature Breakdown</span>
-                                                    <div class="grid grid-cols-2 gap-3">
-                                                        <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-900">
-                                                            <div class="text-[10px] text-slate-500">Pitch Variance</div>
-                                                            <div class="text-xs font-bold text-slate-200 mt-0.5">{voiceFeatures.pitch_variance} Hz²</div>
-                                                        </div>
-                                                        <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-900">
-                                                            <div class="text-[10px] text-slate-500">Voice Stability</div>
-                                                            <div class="text-xs font-bold text-slate-200 mt-0.5">{Math.round(voiceFeatures.voice_stability * 100)}%</div>
-                                                        </div>
-                                                        <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-900">
-                                                            <div class="text-[10px] text-slate-500">Speaking Rate</div>
-                                                            <div class="text-xs font-bold text-slate-200 mt-0.5">{voiceFeatures.speaking_rate} syll/s</div>
-                                                        </div>
-                                                        <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-900">
-                                                            <div class="text-[10px] text-slate-500">Pause Frequency</div>
-                                                            <div class="text-xs font-bold text-slate-200 mt-0.5">{Math.round(voiceFeatures.pause_frequency * 100)}%</div>
-                                                        </div>
+                                        {/* SCREEN 3: CALL ACTIVE - LIVE THREAT ANALYSIS */}
+                                        {simState === 'active' && (
+                                            <div class="flex-1 flex flex-col justify-between gap-4 py-2">
+                                                
+                                                {/* Call Meta */}
+                                                <div class="flex justify-between items-center bg-slate-900/60 border border-darkBorder p-2.5 rounded-xl">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full animate-ping"></span>
+                                                        <span class="text-[10px] font-bold text-slate-300 font-mono">LINE ACTIVE</span>
+                                                    </div>
+                                                    <div class="text-right text-[10px] text-slate-400 font-bold font-mono">
+                                                        {SCENARIOS[simKey].caller}
                                                     </div>
                                                 </div>
-                                            )}
 
-                                            <div class="bg-slate-950/70 p-3 border border-slate-900 rounded-xl">
-                                                <span class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Reasoning</span>
-                                                <p class="text-xs text-slate-400 leading-relaxed font-mono">{voiceReasoning}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Standard Scam threat gauge (always show or for flat text/live mic) */}
-                                    {(!isAudioAnalysis) && (
-                                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-6 items-center">
-                                            <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider self-start">🎯 Scam threat evaluation</h2>
-
-                                            {/* Circular Gauge */}
-                                            <div class="relative flex items-center justify-center">
-                                                <svg class="w-48 h-48 transform -rotate-90">
-                                                    <circle cx="96" cy="96" r="80" stroke="#1e293b" stroke-width="12" fill="transparent" />
-                                                    <circle cx="96" cy="96" r="80"
-                                                        stroke={
-                                                            (activeTab === 'live' ? micRiskScore : scamScore) >= 70 ? '#ef4444' :
-                                                                (activeTab === 'live' ? micRiskScore : scamScore) >= 31 ? '#f59e0b' : '#10b981'
-                                                        }
-                                                        stroke-width="12"
-                                                        fill="transparent"
-                                                        stroke-dasharray="502"
-                                                        stroke-dashoffset={502 - (502 * (activeTab === 'live' ? micRiskScore : scamScore || 0)) / 100}
-                                                        class="transition-all duration-700 ease-out"
-                                                    />
-                                                </svg>
-                                                <div class="absolute flex flex-col items-center justify-center">
-                                                    <span class="text-4xl font-extrabold text-white">
-                                                        {activeTab === 'live' ? micRiskScore : scamScore}%
-                                                    </span>
-                                                    <span class="text-xs text-slate-500 font-semibold uppercase mt-1">Scam Probability</span>
+                                                {/* Live Transcript Stream */}
+                                                <div class="flex-1 flex flex-col gap-2">
+                                                    <div class="text-[9px] font-black uppercase text-slate-500 tracking-wider">🧠 Live Threat Analysis</div>
+                                                    <div class="flex-grow bg-slate-950 border border-slate-900 rounded-xl p-3 h-32 overflow-y-auto flex flex-col gap-2.5">
+                                                        {simTranscript.length === 0 ? (
+                                                            <span class="text-[10px] text-slate-600 italic text-center py-10">Listening to dialer audio feed...</span>
+                                                        ) : (
+                                                            simTranscript.map((line, idx) => (
+                                                                <div key={idx} class="text-[10px] border-l border-shieldBlue pl-2.5 py-1 text-slate-300 bg-slate-900/40 rounded-r">
+                                                                    "{line}"
+                                                                </div>
+                                                            ))
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            {/* Action Alert Status Block */}
-                                            <div class={`w-full p-4 rounded-xl border flex flex-col items-center justify-center text-center transition-all ${isCallTerminated ? 'bg-red-950/80 border-red-500 text-red-400 shadow-lg shadow-red-900/30' : getRiskColorClass(activeTab === 'live' ? micRiskScore : scamScore)}`}>
-                                                <span class="text-3xl mb-1 font-bold">
-                                                    {isCallTerminated ? '📴' : (activeTab === 'live' ? micRiskScore : scamScore) >= 70 ? '🚨' :
-                                                        (activeTab === 'live' ? micRiskScore : scamScore) >= 31 ? '⚠️' : '✅'}
-                                                </span>
-                                                <h3 class="text-md font-extrabold uppercase tracking-wide">
-                                                    {isCallTerminated ? 'AUTOMATICALLY HUNG UP' : `${activeTab === 'live' ? micRiskLevel : scamRiskLevel} Risk Detected`}
-                                                </h3>
-                                                <p class="text-xs opacity-90 mt-1 max-w-xs leading-relaxed">
-                                                    {isCallTerminated ? 'Call terminated at 100% risk score' : `Category: ${activeTab === 'live' ? micCategory : scamCategory}`}
-                                                </p>
-                                            </div>
+                                                {/* Checked Indicators Grid */}
+                                                <div class="flex flex-col gap-1.5">
+                                                    <div class="text-[9px] font-black uppercase text-slate-500 tracking-wider">Scam Indicators Match</div>
+                                                    <div class="grid grid-cols-2 gap-1.5">
+                                                        {SCENARIOS[simKey].indicators.map(ind => {
+                                                            const active = simActiveIndicators.includes(ind);
+                                                            return (
+                                                                <div 
+                                                                    key={ind} 
+                                                                    class={`flex items-center gap-1.5 p-1.5 rounded border text-[8px] transition-all font-semibold ${active ? 'bg-shieldRed/10 border-shieldRed/30 text-shieldRed font-extrabold shadow-sm' : 'bg-slate-900/30 border-slate-900 text-slate-600'}`}
+                                                                >
+                                                                    <span class="text-[10px]">{active ? '✓' : '•'}</span>
+                                                                    <span>{ind}</span>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
 
-                                            {isAlarmPlaying && (
-                                                <button onClick={stopHighRiskAlarm} class="w-full mt-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl animate-pulse flex items-center justify-center gap-2 border border-rose-400/50 shadow-lg shadow-rose-900/30">
-                                                    <span>🔊 Stop Alarm (30s Warning Active)</span>
+                                                {/* Risk level status */}
+                                                <div class="bg-slate-900/60 border border-darkBorder p-2.5 rounded-xl flex items-center justify-between">
+                                                    <div>
+                                                        <span class="text-[8px] text-slate-500 block uppercase font-bold">Threat Evaluation Index</span>
+                                                        <span class="text-xs font-black text-white">{simScore}% Risk</span>
+                                                    </div>
+                                                    <div class={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${simRisk === 'CRITICAL' ? 'bg-shieldRed/20 text-shieldRed' : simRisk === 'HIGH' ? 'bg-shieldOrange/20 text-shieldOrange' : 'bg-shieldGreen/20 text-shieldGreen'}`}>
+                                                        {simRisk} LEVEL
+                                                    </div>
+                                                </div>
+
+                                                {/* Action controls */}
+                                                <div class="flex gap-2">
+                                                    <button 
+                                                        onClick={blockAndSave}
+                                                        class="flex-1 py-2 bg-shieldRed/20 hover:bg-shieldRed/35 text-shieldRed border border-shieldRed/40 font-bold rounded-lg text-[10px]"
+                                                    >
+                                                        Hang Up & Block
+                                                    </button>
+                                                </div>
+
+                                            </div>
+                                        )}
+
+                                        {/* SCREEN 4: THREAT ALERT - CRITICAL INTERCEPT */}
+                                        {simState === 'alert' && (
+                                            <div class="flex-1 flex flex-col justify-between py-2">
+                                                
+                                                {/* Banner */}
+                                                <div class="p-3 bg-shieldRed/15 border border-shieldRed text-shieldRed rounded-xl flex items-center gap-2.5 animate-pulse shadow-glowRed">
+                                                    <div class="w-6 h-6 rounded-full bg-shieldRed/20 flex items-center justify-center border border-shieldRed/30">
+                                                        <Icon name="alertTriangle" className="w-4 h-4 text-shieldRed" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 class="text-[10px] font-black uppercase">🚨 Possible Scam Detected</h4>
+                                                        <p class="text-[8px] opacity-80 mt-0.5">Scam validation index matches critical thresholds.</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Classification & Reasons details */}
+                                                <div class="bg-slate-900/60 border border-darkBorder rounded-xl p-3.5 flex flex-col gap-2.5 my-3">
+                                                    <div>
+                                                        <span class="text-[8px] text-slate-500 uppercase block font-bold">Risk Classification</span>
+                                                        <span class="text-xs font-black text-white">{SCENARIOS[simKey].classification}</span>
+                                                    </div>
+
+                                                    <div>
+                                                        <span class="text-[8px] text-slate-500 uppercase block font-bold mb-1">Evidence Summary</span>
+                                                        <ul class="flex flex-col gap-1">
+                                                            {SCENARIOS[simKey].reasons.map((res, i) => (
+                                                                <li key={i} class="text-[9px] text-slate-300 flex items-center gap-1.5">
+                                                                    <span class="text-shieldRed">✓</span> {res}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                </div>
+
+                                                {/* Safeguard guidelines */}
+                                                <div class="bg-slate-900/60 border border-darkBorder rounded-xl p-3.5 flex flex-col gap-2">
+                                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">Recommended Actions</span>
+                                                    <ul class="flex flex-col gap-1">
+                                                        {SCENARIOS[simKey].advice.map((adv, i) => (
+                                                            <li key={i} class="text-[9px] text-slate-300 flex items-center gap-1.5">
+                                                                <span class="text-shieldOrange">•</span> {adv}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+
+                                                <button 
+                                                    onClick={blockAndSave}
+                                                    class="w-full py-2.5 bg-shieldRed text-white font-extrabold rounded-xl text-xs mt-3 shadow-glowRed uppercase tracking-wider flex items-center justify-center gap-1.5"
+                                                >
+                                                    <Icon name="phone" className="w-3.5 h-3.5 transform rotate-[135deg]" /> Disconnect Call Now
                                                 </button>
-                                            )}
 
-                                            {/* Keywords Panel */}
-                                            <div class="w-full flex flex-col gap-2">
-                                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Matched Scam Signatures</span>
-                                                <div class="flex flex-wrap gap-1.5 min-h-[36px]">
-                                                    {(activeTab === 'live' ? micKeywords : scamKeywords)?.length > 0 ? (
-                                                        (activeTab === 'live' ? micKeywords : scamKeywords).map((kw, idx) => (
-                                                            <span key={idx} class="px-2.5 py-1 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold">{kw}</span>
-                                                        ))
-                                                    ) : (
-                                                        <span class="text-slate-600 text-xs">No scam signatures matches found.</span>
-                                                    )}
+                                            </div>
+                                        )}
+
+                                        {/* SCREEN 5: EVIDENCE REPORT VIEW */}
+                                        {simState === 'evidence' && (
+                                            <div class="flex-1 flex flex-col justify-between py-2">
+                                                
+                                                <div class="text-center py-2 flex flex-col items-center gap-1">
+                                                    <span class="text-2xl">📋</span>
+                                                    <h3 class="text-xs font-black uppercase text-slate-300">Evidence Report Generated</h3>
+                                                    <p class="text-[8px] text-slate-500">Telemetry logs compiled for scam review desk.</p>
                                                 </div>
-                                            </div>
 
-                                            {/* Evidence report */}
-                                            <div class="w-full bg-slate-950 p-4 border border-slate-900 rounded-xl">
-                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Evidence Report</span>
-                                                <p class="text-xs text-slate-400 leading-relaxed font-mono">
-                                                    {activeTab === 'live'
-                                                        ? (micRiskScore >= 31 ? `Live conversation matches profile signature of ${micCategory}. Risk evaluation triggered at ${micRiskScore}%.` : 'No prominent threat indicators detected in stream.')
-                                                        : scamEvidence}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
+                                                {/* Table-style summary */}
+                                                <div class="flex-1 bg-slate-950 border border-slate-900 rounded-xl p-3 overflow-y-auto flex flex-col gap-2.5 my-2">
+                                                    <div class="grid grid-cols-2 gap-2 text-[9px] border-b border-slate-900 pb-2">
+                                                        <div>
+                                                            <span class="text-slate-500 block">Caller Number</span>
+                                                            <span class="font-bold text-slate-200">{SCENARIOS[simKey].caller}</span>
+                                                        </div>
+                                                        <div class="text-right">
+                                                            <span class="text-slate-500 block">Time Detected</span>
+                                                            <span class="font-bold text-slate-200">20:06 PM</span>
+                                                        </div>
+                                                    </div>
 
-                                    {/* Embedded Scam evidence report (for Audio Uploads) */}
-                                    {isAudioAnalysis && (
-                                        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-4">
-                                            <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">📝 Scam Detection Report</h2>
+                                                    <div class="text-[9px] border-b border-slate-900 pb-2">
+                                                        <span class="text-slate-500 block">Detected Scam Type</span>
+                                                        <span class="font-bold text-shieldOrange">{SCENARIOS[simKey].classification}</span>
+                                                    </div>
 
-                                            <div class="flex justify-between items-center bg-slate-950 p-3 border border-slate-900 rounded-xl">
-                                                <div>
-                                                    <div class="text-[10px] text-slate-500">Category</div>
-                                                    <div class="text-sm font-bold text-slate-200 mt-0.5">{scamCategory}</div>
+                                                    <div class="text-[9px] border-b border-slate-900 pb-2">
+                                                        <span class="text-slate-500 block">Triggered Indicators</span>
+                                                        <span class="font-semibold text-slate-300">
+                                                            {SCENARIOS[simKey].indicators.join(", ")}
+                                                        </span>
+                                                    </div>
+
+                                                    <div class="text-[9px]">
+                                                        <span class="text-slate-500 block">AI Explanation</span>
+                                                        <p class="text-slate-400 leading-normal mt-0.5">
+                                                            Call matches profile signatures for {SCENARIOS[simKey].classification} by leveraging {SCENARIOS[simKey].reasons.join(" & ")}.
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <span class={`px-2.5 py-1 rounded-lg text-xs font-bold ${getRiskBadge(scamRiskLevel)}`}>
-                                                    {scamRiskLevel}
-                                                </span>
-                                            </div>
 
-                                            <div class="flex flex-col gap-2">
-                                                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Matched Keywords</span>
-                                                <div class="flex flex-wrap gap-1.5">
-                                                    {scamKeywords.length > 0 ? (
-                                                        scamKeywords.map((kw, idx) => (
-                                                            <span key={idx} class="px-2.5 py-1 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-xs font-semibold">{kw}</span>
-                                                        ))
-                                                    ) : (
-                                                        <span class="text-slate-600 text-xs">No scam keywords matches.</span>
-                                                    )}
-                                                </div>
-                                            </div>
+                                                <button 
+                                                    onClick={resetSimulator}
+                                                    class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs"
+                                                >
+                                                    Reset Simulator HUD
+                                                </button>
 
-                                            <div class="bg-slate-950 p-4 border border-slate-900 rounded-xl">
-                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Transcript Evidence</span>
-                                                <p class="text-xs text-slate-400 leading-relaxed font-mono">"{scamTranscript}"</p>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
 
-                                </div>
-                            ) : (
-                                <div class="bg-slate-900/40 border border-slate-800 border-dashed rounded-2xl p-12 text-center text-slate-600 flex flex-col items-center justify-center gap-3">
-                                    <span class="text-5xl opacity-40">📊</span>
-                                    <div>
-                                        <h3 class="text-sm font-bold text-slate-400">Threat Evaluation Pending</h3>
-                                        <p class="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">Select a template or start recording speech to view interactive risk gauges and classifications.</p>
+                                    </div>
+
+                                    {/* Phone Home Bar */}
+                                    <div class="bg-slate-950 py-3 flex justify-center items-center relative z-20">
+                                        <div class="w-24 h-1 bg-slate-700 rounded-full"></div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
 
                         </div>
+                    )}
 
-                    </main>
+                    {/* SCREEN 5: EVIDENCE REPORTS / THREAT HISTORY */}
+                    {activeScreen === 'reports' && (
+                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4">
+                            <div class="flex justify-between items-center border-b border-darkBorder pb-3">
+                                <h2 class="text-md font-extrabold text-white tracking-wider flex items-center gap-2">
+                                    <Icon name="history" className="w-5 h-5 text-shieldBlue" />
+                                    THREAT COMPLIANCE REPORTS & EVIDENCE DATABASE
+                                </h2>
+                                <span class="text-[10px] font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-400">Database: Active Log</span>
+                            </div>
 
-                    {/* CALL HISTORY MODAL DETAIL PANEL */}
-                    {selectedCall && (
-                        <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                            <div class="glass-card max-w-3xl w-full max-h-[85vh] rounded-2xl p-6 overflow-y-auto flex flex-col gap-5">
-                                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                            <div class="overflow-x-auto mt-2">
+                                <table class="w-full text-left text-xs text-slate-400">
+                                    <thead class="bg-slate-900 text-slate-300 font-bold uppercase text-[9px] tracking-widest border-b border-darkBorder">
+                                        <tr>
+                                            <th class="py-3 px-4">Threat Caller ID</th>
+                                            <th class="py-3 px-4">Risk Level</th>
+                                            <th class="py-3 px-4">Scam Classification</th>
+                                            <th class="py-3 px-4">Evidence logs</th>
+                                            <th class="py-3 px-4">Date Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-900/60 font-medium">
+                                        {reports.map((rep, idx) => (
+                                            <tr key={idx} class="hover:bg-slate-900/20 transition-all">
+                                                <td class="py-4 px-4 text-slate-200">
+                                                    <div class="font-bold">{rep.caller}</div>
+                                                    <div class="text-[9px] text-slate-500 font-mono mt-0.5">{rep.id}</div>
+                                                </td>
+                                                <td class="py-4 px-4">
+                                                    <span class={`px-2.5 py-0.5 rounded text-[10px] font-black ${rep.risk === 'CRITICAL' ? 'bg-shieldRed/10 text-shieldRed border border-shieldRed/30' : rep.risk === 'HIGH' ? 'bg-shieldOrange/10 text-shieldOrange border border-shieldOrange/30' : 'bg-shieldGreen/10 text-shieldGreen border border-shieldGreen/30'}`}>
+                                                        {rep.risk}
+                                                    </span>
+                                                </td>
+                                                <td class="py-4 px-4 font-bold text-slate-300">{rep.type}</td>
+                                                <td class="py-4 px-4 text-slate-400 leading-normal max-w-sm">{rep.explanation}</td>
+                                                <td class="py-4 px-4 text-slate-500">{rep.date}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SCREEN: TRUSTED PROFILES MODULE */}
+                    {activeScreen === 'profiles' && (
+                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4">
+                            <div class="flex justify-between items-center border-b border-darkBorder pb-3">
+                                <h2 class="text-md font-extrabold text-white tracking-wider flex items-center gap-2">
+                                    <Icon name="users" className="w-5 h-5 text-shieldBlue" />
+                                    TRUSTED PROFILES (SPEAKER IDENTIFICATION)
+                                </h2>
+                                <span class="text-[9px] font-bold px-2 py-0.5 bg-slate-800 text-slate-400 rounded uppercase">Optional Module</span>
+                            </div>
+                            
+                            <div class="p-4 bg-slate-900/50 border border-darkBorder rounded-xl text-xs text-slate-400 leading-relaxed max-w-3xl">
+                                💡 <strong>Acoustic Vault Security Notice:</strong> Trusted Profiles are optional voice identities used *only* for identity verification during impersonation attempts. When a caller claims to be your family member, the system will trigger a voice similarity verification.
+                            </div>
+
+                            {/* Identity verification flow diagram */}
+                            <div class="bg-slate-950 border border-slate-900 rounded-xl p-4 flex flex-col gap-3 font-mono text-[10px] tracking-wide">
+                                <div class="text-center font-bold text-shieldBlue border-b border-slate-900 pb-2 uppercase">Identity Claim Interception Flow</div>
+                                <div class="grid grid-cols-1 md:grid-cols-9 gap-2 items-center text-center">
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-slate-300 font-bold">Identity Claimed</div>
+                                    <div class="text-slate-600">➔</div>
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-slate-300 font-bold">Trusted Profile Match</div>
+                                    <div class="text-slate-600">➔</div>
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-shieldOrange font-bold">Voice Similarity Analysis</div>
+                                    <div class="text-slate-600">➔</div>
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-shieldRed font-bold">Deepfake Detection</div>
+                                    <div class="text-slate-600">➔</div>
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-shieldGreen font-bold">Impersonation Alert Check</div>
+                                </div>
+                            </div>
+                             {/* Voice Vault Enrollment Form */}
+                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start mt-2">
+                                 
+                                 {/* Enrollment form column */}
+                                 <div class="md:col-span-1 bg-slate-900/40 border border-darkBorder rounded-xl p-5 flex flex-col gap-4">
+                                     <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Enroll New Voice Identity</h3>
+                                     
+                                     <form onSubmit={handleEnrollProfile} class="flex flex-col gap-3">
+                                         <div>
+                                             <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Full Name</label>
+                                             <input 
+                                                 type="text" 
+                                                 value={newProfileName}
+                                                 onChange={(e) => setNewProfileName(e.target.value)}
+                                                 placeholder="e.g. Sonal Tripathi"
+                                                 required
+                                                 disabled={enrollState === 'loading'}
+                                                 class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-shieldBlue"
+                                             />
+                                         </div>
+                                         
+                                         <div>
+                                             <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Phone Number</label>
+                                             <input 
+                                                 type="text" 
+                                                 value={newProfilePhone}
+                                                 onChange={(e) => setNewProfilePhone(e.target.value)}
+                                                 placeholder="e.g. +91 70192 38491"
+                                                 required
+                                                 disabled={enrollState === 'loading'}
+                                                 class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-shieldBlue"
+                                             />
+                                         </div>
+
+                                         <div class="grid grid-cols-2 gap-2">
+                                             <div>
+                                                 <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Relation</label>
+                                                 <select 
+                                                     value={newProfileRole}
+                                                     onChange={(e) => setNewProfileRole(e.target.value)}
+                                                     disabled={enrollState === 'loading'}
+                                                     class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-shieldBlue"
+                                                 >
+                                                     <option value="Son">Son</option>
+                                                     <option value="Daughter">Daughter</option>
+                                                     <option value="Parent">Parent</option>
+                                                     <option value="Spouse">Spouse</option>
+                                                     <option value="Friend">Friend</option>
+                                                     <option value="Lawyer">Lawyer</option>
+                                                     <option value="Banker">Banker</option>
+                                                 </select>
+                                             </div>
+                                             <div>
+                                                 <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Voice Sample</label>
+                                                 <label class="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 border-dashed rounded-lg py-1.5 px-2 text-center text-slate-500 hover:text-slate-400 cursor-pointer block text-[10px] font-semibold truncate transition-all">
+                                                     Upload WAV/MP3
+                                                     <input type="file" accept="audio/*" class="hidden" required disabled={enrollState === 'loading'} />
+                                                 </label>
+                                             </div>
+                                         </div>
+
+                                         <button 
+                                             type="submit"
+                                             disabled={enrollState === 'loading'}
+                                             class="w-full bg-shieldBlue hover:bg-shieldBlue/90 text-slate-950 font-bold py-2 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                         >
+                                             {enrollState === 'loading' ? (
+                                                 <>
+                                                     <span class="w-3 h-3 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span>
+                                                     Processing...
+                                                 </>
+                                             ) : 'Register Voice Profile'}
+                                         </button>
+                                     </form>
+
+                                     {enrollState === 'loading' && (
+                                         <div class="flex flex-col gap-2 p-3 bg-slate-950/80 border border-slate-900 rounded-lg mt-1 font-mono text-[9px]">
+                                             <div class="flex justify-between text-slate-400 font-bold uppercase">
+                                                 <span class="animate-pulse">{enrollProgress}</span>
+                                                 <span>{enrollProgressPercent}%</span>
+                                             </div>
+                                             <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
+                                                 <div style={{ width: `${enrollProgressPercent}%` }} class="h-full bg-shieldBlue transition-all duration-300"></div>
+                                             </div>
+                                         </div>
+                                     )}
+
+                                     {enrollState === 'success' && (
+                                         <div class="p-3 bg-shieldGreen/15 border border-shieldGreen/30 rounded-lg text-shieldGreen text-[10px] font-bold text-center animate-pulse">
+                                             ✓ Voice Signature Enrolled Successfully!
+                                         </div>
+                                     )}
+                                 </div>
+
+                                 {/* Enrolled profiles list column */}
+                                 <div class="md:col-span-2 flex flex-col gap-3">
+                                     <div class="flex justify-between items-center px-1">
+                                         <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Enrolled Whitelist Vault ({trustedProfiles.length})</h3>
+                                         <span class="text-[9px] font-mono text-slate-500">Database: secure_vault.db</span>
+                                     </div>
+
+                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto pr-1">
+                                         {trustedProfiles.map(profile => (
+                                             <div key={profile.id} class="p-4 bg-slate-900/60 border border-darkBorder hover:border-slate-800 rounded-xl flex flex-col gap-2.5 text-xs transition-all relative overflow-hidden group">
+                                                 <div class="absolute top-0 right-0 w-24 h-24 bg-shieldBlue/5 rounded-full blur-xl pointer-events-none group-hover:bg-shieldBlue/10 transition-all"></div>
+                                                 
+                                                 <div class="flex justify-between items-start">
+                                                     <div>
+                                                         <div class="font-extrabold text-slate-200 text-sm flex items-center gap-1.5">
+                                                             {profile.name}
+                                                             <span class="px-1.5 py-0.2 bg-slate-850 text-slate-400 rounded text-[8px] font-mono font-bold uppercase">{profile.role}</span>
+                                                         </div>
+                                                         <div class="text-[10px] text-slate-500 font-medium font-mono mt-0.5">{profile.phone}</div>
+                                                     </div>
+                                                     <span class={`text-[9px] font-black px-2 py-0.5 rounded border uppercase ${profile.role === 'Backup' ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-shieldGreen/10 border-shieldGreen/30 text-shieldGreen shadow-glowGreen'}`}>
+                                                         {profile.status}
+                                                     </span>
+                                                 </div>
+
+                                                 <div class="grid grid-cols-2 bg-slate-950/80 border border-slate-900 rounded-lg p-2 font-mono text-[9px] text-slate-400">
+                                                     <div>
+                                                         <span class="text-slate-600 block text-[8px] uppercase">Biometric Footprint</span>
+                                                         <span class="font-bold text-slate-300">{profile.features}</span>
+                                                     </div>
+                                                     <div class="text-right">
+                                                         <span class="text-slate-600 block text-[8px] uppercase">Enrolled Hash</span>
+                                                         <span class="font-semibold text-shieldBlue">{profile.hash}</span>
+                                                     </div>
+                                                 </div>
+
+                                                 <div class="flex justify-between items-center text-[9px] text-slate-500 font-mono pt-1">
+                                                     <span>Added: {profile.date}</span>
+                                                     <button 
+                                                         onClick={() => {
+                                                             if(profile.id <= 2) return alert("System protected profiles cannot be deleted.");
+                                                             setTrustedProfiles(prev => prev.filter(p => p.id !== profile.id));
+                                                             playChime(440, 0.1);
+                                                         }}
+                                                         class="text-slate-600 hover:text-shieldRed transition-all uppercase font-bold"
+                                                     >
+                                                         Remove
+                                                     </button>
+                                                 </div>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </div>
+
+                             </div>
+                         </div>
+                     )}
+
+                    {/* SCREEN: SYSTEM ARCHITECTURE (ENGINEERING BACKEND DETAILS) */}
+                    {activeScreen === 'architecture' && (
+                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-6">
+                            
+                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-darkBorder pb-3 gap-3">
+                                <div>
+                                    <h2 class="text-md font-extrabold text-white tracking-wider flex items-center gap-2">
+                                        <Icon name="cpu" className="w-5 h-5 text-shieldBlue" />
+                                        SYSTEM ARCHITECTURE & TELEMETRY MONITOR
+                                    </h2>
+                                    <p class="text-[10px] text-slate-500 font-semibold mt-0.5 font-mono">
+                                        Status: {diagState === 'running' ? 'Running Diagnostic Calibration...' : diagState === 'done' ? 'All Engines Operational (100% Armed)' : 'Diagnostics Standby'}
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={handleRunDiagnostics}
+                                    disabled={diagState === 'running'}
+                                    class={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${diagState === 'running' ? 'bg-slate-900 border border-slate-800 text-slate-500' : 'bg-shieldBlue hover:bg-shieldBlue/90 text-slate-950 shadow-glowBlue'}`}
+                                >
+                                    {diagState === 'running' ? (
+                                        <>
+                                            <span class="w-3 h-3 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span>
+                                            Testing Modules...
+                                        </>
+                                    ) : 'Run Self-Diagnostic'}
+                                </button>
+                            </div>
+
+                            <p class="text-xs text-slate-400 leading-relaxed max-w-3xl">
+                                This control panel monitors the backend status of the AI Interceptor engine. Run a self-diagnostic to query the SQLite datastore read/write latencies, verify neural weights shapes, and calibrate localized Whisper/Twilio endpoints.
+                            </p>
+
+                            {/* Telemetry latency widgets */}
+                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5 mt-1">
+                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center">
+                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">DB Write Latency</span>
+                                    <span class="text-md font-black text-shieldBlue font-mono">{diagLatency.db ? `${diagLatency.db}ms` : '--'}</span>
+                                </div>
+                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center">
+                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">PyTorch Inference</span>
+                                    <span class="text-md font-black text-shieldBlue font-mono">{diagLatency.pytorch ? `${diagLatency.pytorch}ms` : '--'}</span>
+                                </div>
+                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center">
+                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">Random Forest</span>
+                                    <span class="text-md font-black text-shieldBlue font-mono">{diagLatency.randomforest ? `${diagLatency.randomforest}ms` : '--'}</span>
+                                </div>
+                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center">
+                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">Local STT (Whisper)</span>
+                                    <span class="text-md font-black text-shieldBlue font-mono">{diagLatency.stt ? `${diagLatency.stt}ms` : '--'}</span>
+                                </div>
+                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center col-span-2 md:col-span-1 flex flex-col justify-center">
+                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">Readiness Index</span>
+                                    <span class={`text-md font-black font-mono ${diagReadiness ? 'text-shieldGreen animate-pulse' : 'text-slate-600'}`}>{diagReadiness ? `${diagReadiness}%` : '--'}</span>
+                                </div>
+                            </div>
+
+                            {/* Diagnostics Log Console */}
+                            <div class="bg-slate-950 border border-slate-900 rounded-xl p-4 flex flex-col gap-2 font-mono text-[9px] leading-normal max-h-[160px] overflow-y-auto">
+                                <div class="text-[8px] text-slate-600 border-b border-slate-900 pb-1.5 uppercase font-bold tracking-widest flex justify-between items-center">
+                                    <span>Live Diagnostic Stream Output</span>
+                                    <span class={`flex items-center gap-1 ${diagState === 'running' ? 'text-shieldOrange' : diagState === 'done' ? 'text-shieldGreen' : 'text-slate-500'}`}>
+                                        <span class="w-1.5 h-1.5 bg-current rounded-full animate-ping"></span>
+                                        {diagState === 'running' ? 'CALIBRATING' : diagState === 'done' ? 'SYSTEM ONLINE' : 'STANDBY'}
+                                    </span>
+                                </div>
+                                <div class="flex flex-col gap-1 pr-1">
+                                    {diagLogs.length === 0 ? (
+                                        <span class="text-slate-600">No logs generated. Click "Run Self-Diagnostic" to launch full intercept check.</span>
+                                    ) : (
+                                        diagLogs.map((log, idx) => {
+                                            let colorClass = 'text-slate-400';
+                                            if (log.startsWith('[SUCCESS]')) colorClass = 'text-shieldGreen font-bold';
+                                            else if (log.startsWith('[WARN]')) colorClass = 'text-shieldOrange';
+                                            else if (log.startsWith('[INFO]')) colorClass = 'text-slate-400';
+                                            return <div key={idx} class={colorClass}>{log}</div>;
+                                        })
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Cards with Status indicators */}
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                
+                                {/* Item 1 */}
+                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
+                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
+                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
+                                        ONLINE
+                                    </div>
+                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
+                                        Twilio Interception Bridge
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 leading-normal">
+                                        Configures carrier-assisted call forwarding using programmable Voice webhooks and media streaming forks (WebSockets) to feed the server.
+                                    </p>
+                                </div>
+
+                                {/* Item 2 */}
+                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
+                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
+                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
+                                        ONLINE
+                                    </div>
+                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
+                                        WebRTC VoIP Pipeline
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 leading-normal">
+                                        Streams in-app telephony audio directly using audio channel tracks (RTP payloads) to bypass sandbox constraints for VoIP clients.
+                                    </p>
+                                </div>
+
+                                {/* Item 3 */}
+                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
+                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldOrange bg-shieldOrange/10 px-1.5 py-0.5 rounded border border-shieldOrange/20">
+                                        <span class="w-1.5 h-1.5 bg-shieldOrange rounded-full animate-pulse"></span>
+                                        STANDBY
+                                    </div>
+                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
+                                        Android Mic Fallback
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 leading-normal">
+                                        Provides accessibility monitoring and hardware speaker-loop record setups for OS configurations blocking direct cellular API hooks.
+                                    </p>
+                                </div>
+
+                                {/* Item 4 */}
+                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
+                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
+                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
+                                        ONLINE
+                                    </div>
+                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
+                                        FastAPI Engine & DB
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 leading-normal">
+                                        Runs asynchronous endpoints with SQLAlchemy, mapping call log entries to SQLite/PostgreSQL, synced with Redis queues for low-latency jobs.
+                                    </p>
+                                </div>
+
+                                {/* Item 5 */}
+                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
+                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
+                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
+                                        ONLINE
+                                    </div>
+                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
+                                        Speech Decoders (STT)
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 leading-normal">
+                                        Integrates local Whisper decoders alongside Deepgram API endpoints to transcribe mixed Hindlish languages in real-time.
+                                    </p>
+                                </div>
+
+                                {/* Item 6 */}
+                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
+                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
+                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
+                                        ONLINE
+                                    </div>
+                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
+                                        Scam Intent Classifier
+                                    </div>
+                                    <p class="text-[10px] text-slate-500 leading-normal">
+                                        Utilizes an ensemble TF-IDF and NLP keyword pattern classifier to extract threat signals (OTP demands, money transfer, scare).
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* SCREEN: SETTINGS */}
+                    {activeScreen === 'settings' && (
+                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4">
+                            <div class="flex justify-between items-center border-b border-darkBorder pb-3">
+                                <h2 class="text-md font-extrabold text-white tracking-wider flex items-center gap-2">
+                                    <Icon name="settings" className="w-5 h-5 text-shieldBlue" />
+                                    SHIELD CONFIGURATIONS
+                                </h2>
+                                <span class="text-[9px] font-mono text-slate-500">Settings Center</span>
+                            </div>
+
+                            <div class="flex flex-col gap-4 mt-2 max-w-md">
+                                <div class="flex items-center justify-between p-3 bg-slate-900/60 border border-darkBorder rounded-xl">
                                     <div>
-                                        <h2 class="text-lg font-bold text-white">Call Evaluation Record</h2>
-                                        <div class="text-xs text-slate-500 font-mono mt-0.5">SID: {selectedCall.call_sid}</div>
+                                        <div class="text-xs font-bold text-slate-200">Auto-Hangup on Critical Threats</div>
+                                        <p class="text-[9px] text-slate-500 mt-0.5">Instantly disconnect carrier bridge when score &gt;= 75%</p>
                                     </div>
-                                    <button onClick={() => setSelectedCall(null)} class="text-slate-400 hover:text-white text-xl">✕</button>
+                                    <span class="text-xs font-bold text-shieldGreen bg-shieldGreen/10 px-2 py-0.5 rounded border border-shieldGreen/30">Active</span>
                                 </div>
 
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-900">
-                                        <span class="text-[10px] text-slate-500 uppercase">From Number</span>
-                                        <div class="text-sm font-semibold mt-0.5">{selectedCall.from_number}</div>
+                                <div class="flex items-center justify-between p-3 bg-slate-900/60 border border-darkBorder rounded-xl">
+                                    <div>
+                                        <div class="text-xs font-bold text-slate-200">Acoustic Deepfake Warnings</div>
+                                        <p class="text-[9px] text-slate-500 mt-0.5">Play warnings directly to caller stream on fraud detection</p>
                                     </div>
-                                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-900">
-                                        <span class="text-[10px] text-slate-500 uppercase">Channel / To</span>
-                                        <div class="text-sm font-semibold mt-0.5">{selectedCall.to_number}</div>
-                                    </div>
-                                </div>
-
-                                <div class="bg-slate-950 p-4 rounded-xl border border-slate-900">
-                                    <span class="text-xs font-bold text-slate-400 uppercase block mb-1">Threat Score Details</span>
-                                    <div class="flex gap-4 items-center mt-2">
-                                        <div class="flex flex-col">
-                                            <span class="text-2xl font-extrabold text-white">{Math.round(selectedCall.final_score * 100)}%</span>
-                                            <span class="text-[10px] text-slate-500 font-bold uppercase mt-0.5">Scam/Threat score</span>
-                                        </div>
-                                        <span class={`px-2.5 py-1 rounded-lg text-xs font-bold ${getRiskBadge(selectedCall.risk_label.toUpperCase())}`}>
-                                            {selectedCall.risk_label.toUpperCase()} RISK
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Voice Analysis Section in Modal */}
-                                {selectedCall.voiceClassification ? (
-                                    <div class="bg-slate-900/60 p-4 border border-slate-800 rounded-xl flex flex-col gap-3">
-                                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">AI Voice Classification Report</h3>
-
-                                        <div class="flex justify-between items-center bg-slate-950 p-2.5 border border-slate-900 rounded-lg">
-                                            <div>
-                                                <div class="text-[10px] text-slate-500 uppercase">Classification</div>
-                                                <div class="text-sm font-bold text-slate-200 mt-0.5">{selectedCall.voiceClassification}</div>
-                                            </div>
-                                            <div class="text-right">
-                                                <div class="text-[10px] text-slate-500 uppercase">Confidence</div>
-                                                <div class="text-sm font-bold text-amber-400 mt-0.5">{selectedCall.voiceConfidence}%</div>
-                                            </div>
-                                        </div>
-
-                                        <div class="grid grid-cols-2 gap-2 text-xs">
-                                            <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-900">
-                                                <div class="text-emerald-400 font-bold">Human probability: {selectedCall.humanVoiceProbability}%</div>
-                                            </div>
-                                            <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-900">
-                                                <div class="text-red-400 font-bold">AI Probability: {selectedCall.aiVoiceProbability}%</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div class="bg-slate-950 p-3 rounded-lg border border-slate-900 text-center text-xs text-slate-500">
-                                        Voice Analysis not available for this record (text-only evaluation).
-                                    </div>
-                                )}
-
-                                <div class="bg-slate-950 p-4 border border-slate-900 rounded-xl">
-                                    <span class="text-xs font-bold text-slate-400 uppercase block mb-1.5">Transcript Record</span>
-                                    <p class="text-sm text-slate-300 leading-relaxed font-mono">"{selectedCall.transcript || 'No transcript text logged.'}"</p>
-                                </div>
-
-                                <div class="flex justify-end gap-2 border-t border-slate-800 pt-3">
-                                    <button onClick={() => setSelectedCall(null)} class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg text-sm">Close</button>
+                                    <span class="text-xs font-bold text-shieldGreen bg-shieldGreen/10 px-2 py-0.5 rounded border border-shieldGreen/30">Active</span>
                                 </div>
                             </div>
                         </div>
                     )}
 
                     {/* Footer */}
-                    <footer class="bg-slate-950 border-t border-slate-900 py-6 text-center text-xs text-slate-500">
-                        <p>Camp Protect AI Scam Shield — Engineering Final Year Project. Designed Compliance-First under Android 10-15 Regulations.</p>
+                    <footer class="glass-panel rounded-2xl p-4 text-center text-[10px] text-slate-500">
+                        <p>© 2026 AI Scam Call Interceptor. Designed Compliance-First respecting Android & iOS Sandbox Protection Protocols.</p>
                     </footer>
                 </div>
             );

@@ -26,8 +26,9 @@ from sqlalchemy.orm import Session
 # Internal modules
 from database import (
     init_db, get_db, SessionLocal,
-    CallSession, ScoreEvent, AppSettings, SavedContact,
+    CallSession, ScoreEvent, AppSettings, SavedContact, ReputationReport,
     create_call, update_call_score, close_call, is_known_number,
+    get_reputation, add_spam_flag,
 )
 from audio_processor import AudioBuffer
 from stt_client import transcribe
@@ -272,6 +273,120 @@ async def twilio_stream(websocket: WebSocket):
         db.close()
 
 
+def analyze_xai_threat(
+    text: str,
+    voice_label: str,
+    voice_conf: float,
+    rep_data: dict,
+    caller_phone: str,
+    db: Session
+) -> dict:
+    """
+    Computes weighted sub-scores for text, voice, and reputation,
+    generating a detailed Explainable AI (XAI) threat report.
+    """
+    text_lower = text.lower()
+    risk_factors = []
+    
+    # 1. NLP Intent Analysis
+    nlp_score = 0.0
+    nlp_evidence = []
+    
+    otp_phrases = ["otp", "one time password", "verification code", "digits sent", "pin code", "share your code"]
+    urgency_phrases = ["immediately", "avoid arrest", "jail", "within 2 hours", "account block", "immediately block"]
+    banking_phrases = ["customs", "cbi", "police custody", "bank details", "card block", "kyc verify", "aadhaar verification"]
+    
+    matched_otps = [p for p in otp_phrases if p in text_lower]
+    matched_urgency = [p for p in urgency_phrases if p in text_lower]
+    matched_banking = [p for p in banking_phrases if p in text_lower]
+    
+    if matched_otps:
+        nlp_score += 0.40
+        nlp_evidence.append(f"OTP Request detected: '{matched_otps[0]}'")
+    if matched_urgency:
+        nlp_score += 0.30
+        nlp_evidence.append(f"Urgent/Threatening language: '{matched_urgency[0]}'")
+    if matched_banking:
+        nlp_score += 0.30
+        nlp_evidence.append(f"Government/Banking spoof terms: '{matched_banking[0]}'")
+        
+    nlp_score = min(nlp_score, 1.0)
+    if nlp_score > 0.0:
+        risk_factors.append({
+            "indicator": "NLP Intent Classifier",
+            "weight": 0.45,
+            "score": nlp_score,
+            "evidence": ", ".join(nlp_evidence)
+        })
+        
+    # 2. Voice Authenticity Analysis
+    voice_score = 0.0
+    if voice_label == "synthetic":
+        voice_score = voice_conf
+        risk_factors.append({
+            "indicator": "Voice Authenticity",
+            "weight": 0.35,
+            "score": voice_score,
+            "evidence": f"Voice classified as Synthetic/Deepfake (confidence: {voice_conf:.2%})"
+        })
+        
+    # 3. Caller Reputation Analysis
+    rep_score = 0.0
+    if rep_data and rep_data.get("flag_count", 0) > 0:
+        flags = rep_data["flag_count"]
+        # Scale reputation score based on flag count
+        rep_score = min(0.3 + (flags - 1) * 0.1, 1.0)
+        risk_factors.append({
+            "indicator": "Reputation Metadata",
+            "weight": 0.20,
+            "score": rep_score,
+            "evidence": f"Caller has been flagged {flags} times in the spam database"
+        })
+        
+    # 4. Identity Impersonation Check (Cross-Matching)
+    relationship_claims = ["sonal", "beti", "beta", "daughter", "son", "family", "relative", "sister", "brother"]
+    matched_relations = [r for r in relationship_claims if r in text_lower]
+    if matched_relations and caller_phone:
+        risk_factors.append({
+            "indicator": "Identity Claim Verification",
+            "weight": 0.15,
+            "score": 0.90,
+            "evidence": f"Caller claims family relation ('{matched_relations[0]}') from an unknown number"
+        })
+        # Add a high threat modifier
+        nlp_score = max(nlp_score, 0.85)
+
+    # 5. Weighted Risk Ensemble Calculation
+    total_weights = 0.0
+    weighted_sum = 0.0
+    for factor in risk_factors:
+        w = factor["weight"]
+        s = factor["score"]
+        weighted_sum += w * s
+        total_weights += w
+        
+    final_score = round(weighted_sum / total_weights, 3) if total_weights > 0.0 else 0.0
+    
+    # If a synthetic voice is matched with a relationship claim, force high fraud score
+    if voice_label == "synthetic" and matched_relations:
+        final_score = max(final_score, 0.95)
+        
+    is_suspicious = final_score >= 0.41
+    risk_label = "safe"
+    if final_score >= 0.71:
+        risk_label = "fraud"
+    elif final_score >= 0.41:
+        risk_label = "suspicious"
+        
+    return {
+        "is_suspicious": is_suspicious,
+        "fraud_score": final_score,
+        "risk_label": risk_label,
+        "risk_factors": risk_factors,
+        "mitigation_advice": "High risk of AI voice cloning. Do NOT share OTP or transfer funds." if final_score >= 0.71 else "Proceed with caution. Do not share personal details."
+    }
+
+
 async def _process_audio_chunk(
     pcm_bytes: bytes,
     call_sid: str,
@@ -279,8 +394,8 @@ async def _process_audio_chunk(
     db,
     warning_sent: bool,
 ):
-    """Process one buffered audio chunk: STT → score → act."""
-    # 1. Transcribe
+    """Process one buffered audio chunk: STT + Voice Clone Detection + XAI Attribution → score → act."""
+    # 1. Transcribe audio to text
     text = await transcribe(pcm_bytes)
     if not text:
         return
@@ -291,33 +406,69 @@ async def _process_audio_chunk(
         transcript.pop(0)
     rolling_text = " ".join(transcript)
 
-    # 2. Score
-    if MODEL_LOADED and engine:
-        score, label = engine.predict_rolling(rolling_text)
-    else:
-        # Demo mode: keyword-based fallback
-        score, label = _demo_score(rolling_text)
-
-    print(f"[AI] call={call_sid} score={score:.3f} label={label} | '{text[:60]}'")
-
-    # 3. Persist score event
-    update_call_score(db, call_sid, score, label, text)
-
-    # 4. Broadcast to SSE queue
-    q = live_queues.get(call_sid)
-    if q and not q.full():
-        await q.put({"score": score, "label": label, "transcript": text})
-
-    # 5. Take action
+    # Get caller number & settings
+    call_row = db.query(CallSession).filter_by(call_sid=call_sid).first()
+    from_num = call_row.from_number if call_row else "Unknown"
     settings = db.query(AppSettings).first()
     threshold  = settings.risk_threshold if settings else 0.71
     auto_hup   = settings.auto_hangup   if settings else True
     push_token = settings.expo_push_token if settings else None
 
-    # Get caller number for notifications
-    call_row = db.query(CallSession).filter_by(call_sid=call_sid).first()
-    from_num = call_row.from_number if call_row else "Unknown"
+    # Get caller reputation details
+    rep_data = get_reputation(db, from_num)
 
+    # 2a. Score voice authenticity (real-time voice clone / deepfake check)
+    voice_label = "human"
+    voice_score = 0.0
+    
+    if ai_voice_detector:
+        try:
+            pred_label, probs = ai_voice_detector.predict_pcm(pcm_bytes)
+            if pred_label in ["AI-Generated", "Deepfake/Synthetic"]:
+                voice_label = "synthetic"
+                voice_score = float(max(probs.values()))
+                
+                # Update DB row with live voice metrics
+                if call_row:
+                    call_row.voiceClassification = pred_label
+                    call_row.voiceConfidence = voice_score
+                    call_row.aiVoiceProbability = float(probs.get("AI-Generated", 0.0))
+                    call_row.humanVoiceProbability = float(probs.get("Human", 0.0))
+                    call_row.aiVoiceScore = voice_score
+                    db.commit()
+        except Exception as e:
+            print(f"[AI Voice Error] Prediction failed during stream: {e}")
+
+    # 2b. Compute explainable threat score from all indicators (Text, Voice, Reputation, Impersonation)
+    xai_result = analyze_xai_threat(rolling_text, voice_label, voice_score, rep_data, from_num, db)
+    score = xai_result["fraud_score"]
+    label = xai_result["risk_label"]
+
+    print(f"[AI] call={call_sid} score={score:.3f} label={label} voice={voice_label} reputation={rep_data['reputation_label']} | '{text[:60]}'")
+
+    # 3. Persist score event & update XAI attributes
+    import json
+    update_call_score(
+        db, call_sid, score, label, text, 
+        xai_risk_factors=json.dumps(xai_result["risk_factors"]), 
+        mitigation_advice=xai_result["mitigation_advice"]
+    )
+
+    # 4. Broadcast rich XAI response to SSE queue
+    q = live_queues.get(call_sid)
+    if q and not q.full():
+        await q.put({
+            "score": score, 
+            "label": label, 
+            "transcript": text,
+            "voice_label": voice_label,
+            "voice_score": voice_score,
+            "reputation_flags": rep_data["flag_count"],
+            "risk_factors": xai_result["risk_factors"],
+            "mitigation_advice": xai_result["mitigation_advice"]
+        })
+
+    # 5. Take action
     if not warning_sent:
         if label == "fraud" and score >= threshold:
             # Push notification to phone
@@ -428,6 +579,12 @@ def get_call(call_sid: str, db: Session = Depends(get_db)):
 
 
 def _serialize_call(c: CallSession) -> dict:
+    import json
+    try:
+        factors = json.loads(c.xai_risk_factors) if c.xai_risk_factors else []
+    except Exception:
+        factors = []
+        
     return {
         "id":                     c.id,
         "call_sid":               c.call_sid,
@@ -446,6 +603,8 @@ def _serialize_call(c: CallSession) -> dict:
         "aiVoiceProbability":     c.aiVoiceProbability,
         "voiceClassification":    c.voiceClassification,
         "voiceConfidence":        c.voiceConfidence,
+        "xai_risk_factors":       factors,
+        "mitigation_advice":      c.mitigation_advice or "",
     }
 
 
@@ -608,36 +767,26 @@ def health():
 # ─────────────────────────────────────────────
 # Contacts API — sync phone contacts to filter known callers
 # ─────────────────────────────────────────────
-class ContactItem(BaseModel):
-    name: Optional[str] = None
-    phone: str
-
 class ContactsSync(BaseModel):
-    contacts: list[ContactItem]
+    hashes: list[str]
 
 
 @app.post("/api/contacts/sync")
 def sync_contacts(body: ContactsSync, db: Session = Depends(get_db)):
     """
-    Mobile app calls this once (and on contact changes) to upload saved contacts.
+    Mobile app calls this to upload SHA-256 hashes of saved contacts.
     Backend uses this to skip AI analysis for known numbers.
     """
-    import re
-    def normalize(n: str) -> str:
-        n = re.sub(r'[^\d]', '', str(n))
-        if len(n) == 12 and n.startswith('91'): n = n[2:]
-        if len(n) == 11 and n.startswith('0'):  n = n[1:]
-        return '+91' + n[-10:] if len(n) >= 10 else n
-
     added, skipped = 0, 0
-    for item in body.contacts:
-        norm = normalize(item.phone)
-        if len(norm) < 10:
+    for h in body.hashes:
+        h_clean = str(h).strip().lower()
+        # Verify that it is a valid SHA-256 hex string
+        if len(h_clean) != 64 or not all(c in "0123456789abcdef" for c in h_clean):
             skipped += 1
             continue
-        exists = db.query(SavedContact).filter_by(phone=norm).first()
+        exists = db.query(SavedContact).filter_by(phone_hash=h_clean).first()
         if not exists:
-            db.add(SavedContact(name=item.name, phone=norm))
+            db.add(SavedContact(phone_hash=h_clean))
             added += 1
     db.commit()
     total = db.query(SavedContact).count()
@@ -654,6 +803,28 @@ def clear_contacts(db: Session = Depends(get_db)):
     db.query(SavedContact).delete()
     db.commit()
     return {"status": "cleared"}
+
+
+# ─────────────────────────────────────────────
+# Reputation Database & Scam Reporting API
+# ─────────────────────────────────────────────
+class SpamReportRequest(BaseModel):
+    phone: str
+    category: str
+    comment: str
+
+
+@app.get("/api/reputation/{phone}")
+def get_number_reputation(phone: str, db: Session = Depends(get_db)):
+    """Fetch spam flags count, comments, and severity for a phone number."""
+    return get_reputation(db, phone)
+
+
+@app.post("/api/reputation/report")
+def report_spam_number(body: SpamReportRequest, db: Session = Depends(get_db)):
+    """Submit a scam/spam flag for an unknown phone number."""
+    add_spam_flag(db, body.phone, body.category, body.comment)
+    return {"status": "reported", "phone": body.phone}
 
 
 # ─────────────────────────────────────────────

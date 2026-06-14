@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String defaultBaseUrl = "https://i-scam-shield.onrender.com"; // Live production Render URL
+  static const String defaultBaseUrl = "https://slick-emus-hammer.loca.lt"; // Live production Railway URL
 
   static Future<String> getBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();

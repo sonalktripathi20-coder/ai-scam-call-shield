@@ -163,8 +163,8 @@ class AIVoiceDetector:
             else:
                 mfcc = mfcc[:self.seq_len]
             
-            # Convert to tensor
-            x = torch.tensor(mfcc[np.newaxis, :], dtype=torch.float32).to(self.device)
+            # Convert to tensor with shape (1, num_features, seq_len) -> (1, 13, 200)
+            x = torch.tensor(mfcc.T, dtype=torch.float32).unsqueeze(0).to(self.device)
             
             # Inference
             with torch.no_grad():

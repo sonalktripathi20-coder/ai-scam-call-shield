@@ -82,6 +82,11 @@ class CallSession(Base):
     # Transcript
     full_transcript = Column(Text, default="")
 
+    # Explainable AI (XAI) parameters
+    xai_risk_factors  = Column(Text, default="[]") # JSON list of reasons/weights/scores
+    mitigation_advice = Column(Text, default="")
+    reputation_score  = Column(Float, default=0.0)
+
     # Action taken
     action_taken   = Column(String(32), nullable=True)  # warning_injected|hung_up|none
     action_at      = Column(DateTime, nullable=True)
@@ -118,14 +123,24 @@ class AppSettings(Base):
 
 
 class SavedContact(Base):
-    """Phone contacts synced from the mobile app."""
+    """Phone contacts synced from the mobile app (stored as SHA-256 hashes for privacy)."""
     __tablename__ = "saved_contacts"
 
     id          = Column(Integer, primary_key=True, index=True)
-    name        = Column(String(128), nullable=True)
-    # Normalized E.164 number, e.g. +919876543210
-    phone       = Column(String(20), unique=True, index=True, nullable=False)
+    phone_hash  = Column(String(64), unique=True, index=True, nullable=False)
     synced_at   = Column(DateTime, default=datetime.utcnow)
+
+
+class ReputationReport(Base):
+    """Stores spam flags and reputation details for incoming phone numbers."""
+    __tablename__ = "reputation_reports"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    phone        = Column(String(20), unique=True, index=True, nullable=False)  # Normalized number
+    flag_count   = Column(Integer, default=0)
+    reports_list = Column(Text, default="[]")  # JSON string of individual reports
+    created_at   = Column(DateTime, default=datetime.utcnow)
+    updated_at   = Column(DateTime, default=datetime.utcnow)
 
 
 def init_db():
@@ -162,10 +177,12 @@ def init_db():
 
 def is_known_number(db: Session, phone: str) -> bool:
     """
-    Normalize and check if a phone number is in saved contacts.
+    Normalize and check if the SHA-256 hash of a phone number matches saved contacts.
     Strips spaces, dashes, +91 country code variations.
     """
     import re
+    import hashlib
+
     def normalize(n: str) -> str:
         n = re.sub(r'[^\d]', '', str(n))  # digits only
         if len(n) == 12 and n.startswith('91'):
@@ -175,11 +192,11 @@ def is_known_number(db: Session, phone: str) -> bool:
         return n[-10:]  # last 10 digits
 
     normalized_input = normalize(phone)
-    contacts = db.query(SavedContact).all()
-    for c in contacts:
-        if normalize(c.phone) == normalized_input:
-            return True
-    return False
+    hashed_input = hashlib.sha256(normalized_input.encode('utf-8')).hexdigest()
+    
+    # Direct indexed lookup for optimal scaling
+    exists = db.query(SavedContact).filter_by(phone_hash=hashed_input).first() is not None
+    return exists
 
 
 def get_db() -> Session:
@@ -210,17 +227,35 @@ def create_call(db: Session, call_sid: str, from_num: str, to_num: str,
     return call
 
 
-def update_call_score(db: Session, call_sid: str, score: float, label: str,
-                       transcript_chunk: str):
+def update_call_score(
+    db: Session,
+    call_sid: str,
+    score: float,
+    label: str,
+    transcript_chunk: str,
+    xai_risk_factors: str = None,
+    mitigation_advice: str = None
+):
     db.add(ScoreEvent(
         call_sid=call_sid, score=score, label=label,
         transcript_chunk=transcript_chunk
     ))
     # Update the call's final score if this is higher (worst-case tracking)
     call = db.query(CallSession).filter_by(call_sid=call_sid).first()
-    if call and score > call.final_score:
-        call.final_score = score
-        call.risk_label  = label
+    if call:
+        if call.full_transcript:
+            call.full_transcript += " " + transcript_chunk
+        else:
+            call.full_transcript = transcript_chunk
+
+        if score > call.final_score:
+            call.final_score = score
+            call.risk_label  = label
+
+        if xai_risk_factors:
+            call.xai_risk_factors = xai_risk_factors
+        if mitigation_advice:
+            call.mitigation_advice = mitigation_advice
     db.commit()
 
 
@@ -233,3 +268,87 @@ def close_call(db: Session, call_sid: str, action: str = "none"):
         if action != "none":
             call.action_at = datetime.utcnow()
         db.commit()
+
+
+# ─────────────────────────────────────────────
+# Reputation Helper Functions
+# ─────────────────────────────────────────────
+def get_reputation(db: Session, phone: str) -> dict:
+    """Get spam flags and reputation history for a number. Returns default if not found."""
+    import re
+    import json
+    
+    def normalize(n: str) -> str:
+        n = re.sub(r'[^\d]', '', str(n))  # digits only
+        if len(n) == 12 and n.startswith('91'): n = n[2:]
+        if len(n) == 11 and n.startswith('0'):  n = n[1:]
+        return n[-10:]  # last 10 digits
+        
+    norm_phone = normalize(phone)
+    rep = db.query(ReputationReport).filter_by(phone=norm_phone).first()
+    if not rep:
+        return {
+            "phone": phone,
+            "flag_count": 0,
+            "reports": [],
+            "reputation_label": "safe"
+        }
+        
+    try:
+        reports = json.loads(rep.reports_list)
+    except Exception:
+        reports = []
+        
+    # Classify reputation based on report counts
+    label = "safe"
+    if rep.flag_count >= 10:
+        label = "fraud"
+    elif rep.flag_count >= 3:
+        label = "suspicious"
+        
+    return {
+        "phone": norm_phone,
+        "flag_count": rep.flag_count,
+        "reports": reports,
+        "reputation_label": label
+    }
+
+
+def add_spam_flag(db: Session, phone: str, category: str, comment: str):
+    """Add a spam report for a phone number."""
+    import re
+    import json
+    
+    def normalize(n: str) -> str:
+        n = re.sub(r'[^\d]', '', str(n))
+        if len(n) == 12 and n.startswith('91'): n = n[2:]
+        if len(n) == 11 and n.startswith('0'):  n = n[1:]
+        return n[-10:]
+        
+    norm_phone = normalize(phone)
+    rep = db.query(ReputationReport).filter_by(phone=norm_phone).first()
+    
+    new_report = {
+        "category": category,
+        "comment": comment,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    if not rep:
+        rep = ReputationReport(
+            phone=norm_phone,
+            flag_count=1,
+            reports_list=json.dumps([new_report])
+        )
+        db.add(rep)
+    else:
+        try:
+            reports = json.loads(rep.reports_list)
+        except Exception:
+            reports = []
+        reports.append(new_report)
+        rep.reports_list = json.dumps(reports)
+        rep.flag_count += 1
+        rep.updated_at = datetime.utcnow()
+        
+    db.commit()

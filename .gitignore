@@ -1,0 +1,10 @@
+backend/venv/
+node_modules/
+target/
+__pycache__/
+.idea/
+.vscode/
+*.pyc
+*.db
+*.log
+*.apk
