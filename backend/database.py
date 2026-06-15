@@ -15,6 +15,10 @@ from sqlalchemy.pool import StaticPool
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH  = os.getenv("DB_PATH", os.path.join(BASE_DIR, "scam_shield.db"))
 
+# Vercel serverless environments have a read-only filesystem except for /tmp
+if os.getenv("VERCEL"):
+    DB_PATH = "/tmp/scam_shield.db"
+
 try:
     engine = create_engine(
         f"sqlite:///{DB_PATH}",
