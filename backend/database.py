@@ -132,6 +132,20 @@ class SavedContact(Base):
     synced_at   = Column(DateTime, default=datetime.utcnow)
 
 
+class VoiceProfile(Base):
+    """Enrolled voice identity profiles for voice vault analysis."""
+    __tablename__ = "voice_profiles"
+
+    id       = Column(Integer, primary_key=True, index=True)
+    name     = Column(String(100), nullable=False)
+    role     = Column(String(50), nullable=False)
+    phone    = Column(String(50), nullable=False)
+    hash     = Column(String(100), nullable=False)
+    status   = Column(String(50), default="Voice Authenticated")
+    features = Column(String(200), nullable=True)
+    date     = Column(String(100), nullable=True)
+
+
 class ReputationReport(Base):
     """Stores spam flags and reputation details for incoming phone numbers."""
     __tablename__ = "reputation_reports"
@@ -152,8 +166,9 @@ def init_db():
         Base.metadata.create_all(bind=engine)
         db = SessionLocal()
         try:
-            # Force schema validation of CallSession to trigger OperationalError on mismatch
+            # Force schema validation to trigger OperationalError on mismatch
             db.query(CallSession).first()
+            db.query(VoiceProfile).first()
             
             if not db.query(AppSettings).first():
                 db.add(AppSettings())

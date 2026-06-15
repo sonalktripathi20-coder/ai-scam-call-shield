@@ -30,7 +30,7 @@ from sqlalchemy.orm import Session
 # Internal modules
 from database import (
     init_db, get_db, SessionLocal,
-    CallSession, ScoreEvent, AppSettings, SavedContact, ReputationReport,
+    CallSession, ScoreEvent, AppSettings, SavedContact, ReputationReport, VoiceProfile,
     create_call, update_call_score, close_call, is_known_number,
     get_reputation, add_spam_flag,
 )
@@ -807,6 +807,66 @@ def clear_contacts(db: Session = Depends(get_db)):
     db.query(SavedContact).delete()
     db.commit()
     return {"status": "cleared"}
+
+
+# ─────────────────────────────────────────────
+# Voice Profiles (Voice Vault) API
+# ─────────────────────────────────────────────
+class VoiceProfileCreate(BaseModel):
+    name: str
+    role: str
+    phone: str
+    hash: str
+    status: Optional[str] = "Voice Authenticated"
+    features: Optional[str] = None
+    date: Optional[str] = None
+
+
+@app.get("/api/voice-profiles")
+def get_voice_profiles(db: Session = Depends(get_db)):
+    """Fetch all enrolled voice vault profiles."""
+    profiles = db.query(VoiceProfile).all()
+    # If empty, seed default profiles so there's always baseline mock data
+    if not profiles:
+        return [
+            { "id": 1, "name": "Sonal Tripathi", "role": "Son", "phone": "+91 70192 38491", "hash": "98a3b50c18d9f4e2...", "status": "Voice Authenticated", "date": "June 12, 2026", "features": "Pitch: 142.4Hz, HNR: 11.4dB" },
+            { "id": 2, "name": "Family Backup Desk", "role": "Backup", "phone": "+91 80012 34567", "hash": "41b2c3d4e5f6a7b8...", "status": "Vault Enrolled", "date": "June 13, 2026", "features": "Pitch: 210.8Hz, HNR: 14.8dB" }
+        ]
+    return profiles
+
+
+@app.post("/api/voice-profiles")
+def create_voice_profile(body: VoiceProfileCreate, db: Session = Depends(get_db)):
+    """Enroll a new voice profile."""
+    # Prevent adding duplicate phones
+    existing = db.query(VoiceProfile).filter_by(phone=body.phone).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="A profile with this phone number is already enrolled.")
+        
+    db_profile = VoiceProfile(
+        name=body.name,
+        role=body.role,
+        phone=body.phone,
+        hash=body.hash,
+        status=body.status,
+        features=body.features,
+        date=body.date
+    )
+    db.add(db_profile)
+    db.commit()
+    db.refresh(db_profile)
+    return db_profile
+
+
+@app.delete("/api/voice-profiles/{profile_id}")
+def delete_voice_profile(profile_id: int, db: Session = Depends(get_db)):
+    """Remove a voice profile from the database."""
+    profile = db.query(VoiceProfile).filter_by(id=profile_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    db.delete(profile)
+    db.commit()
+    return {"status": "deleted"}
 
 
 # ─────────────────────────────────────────────
