@@ -11,6 +11,10 @@ main.py - FastAPI application
 """
 
 import os
+import sys
+# Resolve local imports when running under Vercel Serverless environment
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import json
 import asyncio
 from datetime import datetime

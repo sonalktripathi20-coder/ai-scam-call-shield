@@ -21,9 +21,6 @@ try:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    # Test connection and check if WAL can be set
-    with engine.connect() as conn:
-        conn.execute("PRAGMA journal_mode=WAL")
 except Exception as e:
     print(f"[WARN] SQLite file-based database at {DB_PATH} failed to initialize ({e}). Falling back to in-memory database.")
     DB_PATH = ":memory:"
