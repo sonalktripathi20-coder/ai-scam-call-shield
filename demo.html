@@ -315,20 +315,121 @@
             const [enrollProgress, setEnrollProgress] = useState('');
             const [enrollProgressPercent, setEnrollProgressPercent] = useState(0);
 
+            // Live Recording & Upload States
+            const [voiceInputMethod, setVoiceInputMethod] = useState('upload'); // 'upload' | 'record'
+            const [isRecording, setIsRecording] = useState(false);
+            const [recordingTimer, setRecordingTimer] = useState(0);
+            const [recordedBlob, setRecordedBlob] = useState(null);
+            const [playbackUrl, setPlaybackUrl] = useState(null);
+            const [isPlayingBack, setIsPlayingBack] = useState(false);
+            const [selectedFileName, setSelectedFileName] = useState('');
+
+            const mediaRecorderRef = useRef(null);
+            const audioChunksRef = useRef([]);
+            const recordingIntervalRef = useRef(null);
+            const audioPlayerRef = useRef(null);
+
             // Diagnostics State
             const [diagState, setDiagState] = useState('idle'); // 'idle' | 'running' | 'done'
             const [diagLogs, setDiagLogs] = useState([]);
             const [diagLatency, setDiagLatency] = useState({ db: 0, pytorch: 0, randomforest: 0, stt: 0, api: 0 });
             const [diagReadiness, setDiagReadiness] = useState(0);
 
+            // Voice Recording Handlers
+            const startRecording = async () => {
+                try {
+                    audioChunksRef.current = [];
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    const mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorderRef.current = mediaRecorder;
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        if (event.data.size > 0) {
+                            audioChunksRef.current.push(event.data);
+                        }
+                    };
+
+                    mediaRecorder.onstop = () => {
+                        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+                        setRecordedBlob(audioBlob);
+                        const url = URL.createObjectURL(audioBlob);
+                        setPlaybackUrl(url);
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                    setIsRecording(true);
+                    setRecordingTimer(0);
+                    
+                    recordingIntervalRef.current = setInterval(() => {
+                        setRecordingTimer(prev => prev + 1);
+                    }, 1000);
+                    
+                    playChime(660, 0.1);
+                } catch (err) {
+                    console.error("Microphone access error:", err);
+                    alert("Could not access microphone. Please check system permissions.");
+                }
+            };
+
+            const stopRecording = () => {
+                if (mediaRecorderRef.current && isRecording) {
+                    mediaRecorderRef.current.stop();
+                    setIsRecording(false);
+                    if (recordingIntervalRef.current) {
+                        clearInterval(recordingIntervalRef.current);
+                    }
+                    playChime(440, 0.1);
+                }
+            };
+
+            const togglePlayback = () => {
+                if (!playbackUrl) return;
+                if (!audioPlayerRef.current) {
+                    audioPlayerRef.current = new Audio(playbackUrl);
+                    audioPlayerRef.current.onended = () => {
+                        setIsPlayingBack(false);
+                    };
+                }
+                
+                if (isPlayingBack) {
+                    audioPlayerRef.current.pause();
+                    setIsPlayingBack(false);
+                } else {
+                    audioPlayerRef.current.currentTime = 0;
+                    audioPlayerRef.current.play();
+                    setIsPlayingBack(true);
+                }
+            };
+
+            const resetRecording = () => {
+                if (audioPlayerRef.current) {
+                    audioPlayerRef.current.pause();
+                    audioPlayerRef.current = null;
+                }
+                setRecordedBlob(null);
+                setPlaybackUrl(null);
+                setIsPlayingBack(false);
+                setRecordingTimer(0);
+            };
+
             // Voice Enrollment Pipeline
             const handleEnrollProfile = (e) => {
                 e.preventDefault();
                 if (!newProfileName || !newProfilePhone) return;
 
+                if (voiceInputMethod === 'upload' && !selectedFileName) {
+                    alert("Please upload a WAV/MP3 voice sample file first!");
+                    return;
+                }
+                if (voiceInputMethod === 'record' && !recordedBlob) {
+                    alert("Please record a live voice sample first!");
+                    return;
+                }
+
                 setEnrollState('loading');
                 setEnrollProgressPercent(10);
-                setEnrollProgress('Decoding uploaded audio file to 16kHz PCM...');
+                setEnrollProgress(voiceInputMethod === 'record' ? 'Decoding recorded audio buffer to 16kHz PCM...' : 'Decoding uploaded audio file to 16kHz PCM...');
                 playChime(523, 0.1);
 
                 setTimeout(() => {
@@ -376,6 +477,8 @@
                     // Reset
                     setNewProfileName('');
                     setNewProfilePhone('');
+                    setSelectedFileName('');
+                    resetRecording();
                     
                     setTimeout(() => {
                         setEnrollState('idle');
@@ -1245,31 +1348,127 @@
                                              />
                                          </div>
 
-                                         <div class="grid grid-cols-2 gap-2">
-                                             <div>
-                                                 <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Relation</label>
-                                                 <select 
-                                                     value={newProfileRole}
-                                                     onChange={(e) => setNewProfileRole(e.target.value)}
-                                                     disabled={enrollState === 'loading'}
-                                                     class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-shieldBlue"
-                                                 >
-                                                     <option value="Son">Son</option>
-                                                     <option value="Daughter">Daughter</option>
-                                                     <option value="Parent">Parent</option>
-                                                     <option value="Spouse">Spouse</option>
-                                                     <option value="Friend">Friend</option>
-                                                     <option value="Lawyer">Lawyer</option>
-                                                     <option value="Banker">Banker</option>
-                                                 </select>
+                                         <div>
+                                             <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Relation</label>
+                                             <select 
+                                                 value={newProfileRole}
+                                                 onChange={(e) => setNewProfileRole(e.target.value)}
+                                                 disabled={enrollState === 'loading'}
+                                                 class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-shieldBlue"
+                                             >
+                                                 <option value="Son">Son</option>
+                                                 <option value="Daughter">Daughter</option>
+                                                 <option value="Parent">Parent</option>
+                                                 <option value="Spouse">Spouse</option>
+                                                 <option value="Friend">Friend</option>
+                                                 <option value="Lawyer">Lawyer</option>
+                                                 <option value="Banker">Banker</option>
+                                             </select>
+                                         </div>
+
+                                         {/* Voice Sample Input Section */}
+                                         <div class="border-t border-darkBorder/60 pt-3 flex flex-col gap-2.5">
+                                             <div class="flex justify-between items-center">
+                                                 <label class="text-[10px] text-slate-400 font-bold uppercase block">Voice Sample Source</label>
+                                                 <div class="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                                                     <button 
+                                                         type="button"
+                                                         onClick={() => setVoiceInputMethod('upload')}
+                                                         class={`px-2 py-0.5 text-[9px] rounded font-bold transition-all ${voiceInputMethod === 'upload' ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/20' : 'text-slate-500 hover:text-slate-300'}`}
+                                                     >
+                                                         File Upload
+                                                     </button>
+                                                     <button 
+                                                         type="button"
+                                                         onClick={() => setVoiceInputMethod('record')}
+                                                         class={`px-2 py-0.5 text-[9px] rounded font-bold transition-all ${voiceInputMethod === 'record' ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/20' : 'text-slate-500 hover:text-slate-300'}`}
+                                                     >
+                                                         Live Record
+                                                     </button>
+                                                 </div>
                                              </div>
-                                             <div>
-                                                 <label class="text-[10px] text-slate-400 font-bold uppercase block mb-1">Voice Sample</label>
-                                                 <label class="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 border-dashed rounded-lg py-1.5 px-2 text-center text-slate-500 hover:text-slate-400 cursor-pointer block text-[10px] font-semibold truncate transition-all">
-                                                     Upload WAV/MP3
-                                                     <input type="file" accept="audio/*" class="hidden" required disabled={enrollState === 'loading'} />
-                                                 </label>
-                                             </div>
+
+                                             {voiceInputMethod === 'upload' ? (
+                                                 <div>
+                                                     <label class="w-full bg-slate-950 border border-slate-850 hover:border-slate-700 border-dashed rounded-lg py-2 px-2 text-center text-slate-400 hover:text-slate-300 cursor-pointer block text-[10px] font-semibold truncate transition-all">
+                                                         {selectedFileName ? `📁 ${selectedFileName}` : '📁 Upload WAV/MP3 Voice Sample'}
+                                                         <input 
+                                                             type="file" 
+                                                             accept="audio/*" 
+                                                             class="hidden" 
+                                                             disabled={enrollState === 'loading'} 
+                                                             onChange={(e) => {
+                                                                 if(e.target.files && e.target.files[0]) {
+                                                                     setSelectedFileName(e.target.files[0].name);
+                                                                 }
+                                                             }}
+                                                         />
+                                                     </label>
+                                                 </div>
+                                             ) : (
+                                                 <div class="bg-slate-950 border border-slate-900 rounded-lg p-2.5 flex flex-col items-center justify-center gap-2 relative overflow-hidden">
+                                                     {isRecording ? (
+                                                         <div class="absolute top-2 right-2 flex items-center gap-1">
+                                                             <span class="w-1.5 h-1.5 bg-shieldRed rounded-full animate-ping"></span>
+                                                             <span class="text-[8px] font-bold text-shieldRed uppercase font-mono">REC</span>
+                                                         </div>
+                                                     ) : null}
+
+                                                     {isRecording ? (
+                                                         <div class="flex items-center gap-1 h-5 py-1">
+                                                             {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => {
+                                                                 const heights = ['h-2', 'h-4', 'h-5', 'h-3', 'h-4', 'h-4', 'h-2', 'h-5', 'h-3', 'h-1'];
+                                                                 return (
+                                                                     <div key={i} class={`w-0.5 bg-shieldGreen rounded animate-bounce ${heights[i%10]}`} style={{ animationDelay: `${i * 120}ms`, animationDuration: '0.8s' }}></div>
+                                                                 );
+                                                             })}
+                                                         </div>
+                                                     ) : playbackUrl ? (
+                                                         <div class="flex items-center gap-1 py-1">
+                                                             <span class="text-[9px] text-shieldGreen font-bold">✓ Audio Recorded ({recordingTimer}s)</span>
+                                                         </div>
+                                                     ) : (
+                                                         <div class="text-[9px] text-slate-600 italic">No audio recorded yet.</div>
+                                                     )}
+
+                                                     <div class="flex gap-1.5 w-full justify-center">
+                                                         {!isRecording && !playbackUrl ? (
+                                                             <button 
+                                                                 type="button"
+                                                                 onClick={startRecording}
+                                                                 class="px-3 py-1 bg-shieldBlue/10 hover:bg-shieldBlue/20 text-shieldBlue border border-shieldBlue/30 text-[9px] font-bold rounded-lg transition-all flex items-center gap-1"
+                                                             >
+                                                                 🎤 Start Recording
+                                                             </button>
+                                                         ) : isRecording ? (
+                                                             <button 
+                                                                 type="button"
+                                                                 onClick={stopRecording}
+                                                                 class="px-3 py-1 bg-shieldRed/10 hover:bg-shieldRed/20 text-shieldRed border border-shieldRed/30 text-[9px] font-bold rounded-lg transition-all flex items-center gap-1"
+                                                             >
+                                                                 ⏹ Stop ({Math.floor(recordingTimer / 60)}:{(recordingTimer % 60).toString().padStart(2, '0')})
+                                                             </button>
+                                                         ) : (
+                                                             <>
+                                                                 <button 
+                                                                     type="button"
+                                                                     onClick={togglePlayback}
+                                                                     class={`px-2 py-1 text-[9px] font-bold rounded-lg transition-all flex items-center gap-1 ${isPlayingBack ? 'bg-shieldOrange/20 border border-shieldOrange/30 text-shieldOrange' : 'bg-shieldGreen/15 border border-shieldGreen/30 text-shieldGreen'}`}
+                                                                 >
+                                                                     {isPlayingBack ? '⏸ Pause' : '🔊 Play'}
+                                                                 </button>
+                                                                 <button 
+                                                                     type="button"
+                                                                     onClick={resetRecording}
+                                                                     class="px-2 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[9px] font-bold rounded-lg text-slate-400 hover:text-slate-355 transition-all"
+                                                                 >
+                                                                     🗑 Reset
+                                                                 </button>
+                                                             </>
+                                                         )}
+                                                     </div>
+                                                 </div>
+                                             )}
                                          </div>
 
                                          <button 
