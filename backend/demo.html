@@ -304,10 +304,24 @@
             ]);
 
             // Trusted Profiles State
-            const [trustedProfiles, setTrustedProfiles] = useState([
-                { id: 1, name: "Sonal Tripathi", role: "Son", phone: "+91 70192 38491", hash: "98a3b50c18d9f4e2...", status: "Voice Authenticated", date: "June 12, 2026", features: "Pitch: 142.4Hz, HNR: 11.4dB" },
-                { id: 2, name: "Family Backup Desk", role: "Backup", phone: "+91 80012 34567", hash: "41b2c3d4e5f6a7b8...", status: "Vault Enrolled", date: "June 13, 2026", features: "Pitch: 210.8Hz, HNR: 14.8dB" }
-            ]);
+            const [trustedProfiles, setTrustedProfiles] = useState(() => {
+                const saved = localStorage.getItem('trustedProfiles');
+                if (saved) {
+                    try {
+                        return JSON.parse(saved);
+                    } catch (e) {
+                        console.error("Error parsing saved profiles:", e);
+                    }
+                }
+                return [
+                    { id: 1, name: "Sonal Tripathi", role: "Son", phone: "+91 70192 38491", hash: "98a3b50c18d9f4e2...", status: "Voice Authenticated", date: "June 12, 2026", features: "Pitch: 142.4Hz, HNR: 11.4dB" },
+                    { id: 2, name: "Family Backup Desk", role: "Backup", phone: "+91 80012 34567", hash: "41b2c3d4e5f6a7b8...", status: "Vault Enrolled", date: "June 13, 2026", features: "Pitch: 210.8Hz, HNR: 14.8dB" }
+                ];
+            });
+
+            useEffect(() => {
+                localStorage.setItem('trustedProfiles', JSON.stringify(trustedProfiles));
+            }, [trustedProfiles]);
             const [newProfileName, setNewProfileName] = useState('');
             const [newProfilePhone, setNewProfilePhone] = useState('');
             const [newProfileRole, setNewProfileRole] = useState('Son');
