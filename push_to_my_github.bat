@@ -9,15 +9,7 @@ echo Your repository is currently too large (187MB+) because git is
 echo tracking virtual environments (venv), node_modules, and build targets.
 echo.
 
-set /p repo_url="Enter your personal GitHub Repository URL: "
-
-if "%repo_url%"=="" (
-    echo.
-    echo [ERROR] No repository URL was entered. Exiting...
-    echo.
-    pause
-    exit /b
-)
+set repo_url=https://github.com/sonalktripathi20-coder/ai-scam-call-shield.git
 
 echo.
 echo Removing old remote configurations...
@@ -65,4 +57,3 @@ echo =========================================================
 echo  Code successfully cleaned and pushed to your GitHub!
 echo =========================================================
 echo.
-pause
