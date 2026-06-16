@@ -321,20 +321,51 @@
                     }
                 } catch(e) {}
                 return defaultList;
-            });
-
-            const fetchAvailableProfiles = async () => {
+                      const fetchAvailableProfiles = async () => {
                 try {
                     const res = await fetch('/api/user-profiles');
+                    let backendData = [];
                     if (res.ok) {
-                        const data = await res.json();
-                        if (data && data.length > 0) {
-                            setAvailableProfiles(data);
-                            localStorage.setItem('scamShieldProfileList', JSON.stringify(data));
-                        }
+                        backendData = await res.json();
                     }
+                    
+                    // Retrieve offline/local profiles from localStorage
+                    let localData = [];
+                    try {
+                        const saved = localStorage.getItem('scamShieldProfileList');
+                        if (saved) {
+                            localData = JSON.parse(saved);
+                        }
+                    } catch(e) {}
+                    
+                    // Merge local profiles with backend profiles, preserving uniqueness by userid
+                    const combined = [...backendData, ...localData];
+                    const uniqueMap = new Map();
+                    combined.forEach(p => {
+                        if (p && p.userid && p.username) {
+                            uniqueMap.set(p.userid, p);
+                        }
+                    });
+                    
+                    const uniqueProfiles = Array.from(uniqueMap.values());
+                    
+                    // Ensure default profiles are always present
+                    const defaults = [
+                        { username: "Default User", userid: "default_user" },
+                        { username: "Sonal Tripathi", userid: "sonal_tripathi" },
+                        { username: "Vipin Verma", userid: "vipin_verma" },
+                        { username: "Aman Malik", userid: "aman_malik" }
+                    ];
+                    defaults.forEach(d => {
+                        if (!uniqueMap.has(d.userid)) {
+                            uniqueProfiles.push(d);
+                        }
+                    });
+                    
+                    setAvailableProfiles(uniqueProfiles);
+                    localStorage.setItem('scamShieldProfileList', JSON.stringify(uniqueProfiles));
                 } catch (e) {
-                    console.log("Using local profile list.");
+                    console.log("Using local profile list fallback.");
                 }
             };
 
@@ -357,9 +388,12 @@
                 const trimmed = customName.trim();
                 const pId = trimmed.toLowerCase().replace(/\s+/g, '_');
                 
+                const newProfile = { username: trimmed, userid: pId };
+                
+                // Add to local state & storage first for instant feedback
                 const updatedList = [...availableProfiles];
                 if (!updatedList.some(p => p.userid === pId)) {
-                    updatedList.push({ username: trimmed, userid: pId });
+                    updatedList.push(newProfile);
                     setAvailableProfiles(updatedList);
                     localStorage.setItem('scamShieldProfileList', JSON.stringify(updatedList));
                 }
@@ -374,12 +408,15 @@
                     });
                     if (res.ok) {
                         const newProf = await res.json();
-                        await fetchAvailableProfiles();
+                        const finalUpdatedList = updatedList.map(p => p.userid === pId ? newProf : p);
+                        setAvailableProfiles(finalUpdatedList);
+                        localStorage.setItem('scamShieldProfileList', JSON.stringify(finalUpdatedList));
                         handleSwitchProfile(newProf.username);
                     } else {
                         handleSwitchProfile(trimmed);
                     }
                 } catch (e) {
+                    console.error("Failed to register profile on backend:", e);
                     handleSwitchProfile(trimmed);
                 }
             };
@@ -393,6 +430,7 @@
                     return;
                 }
                 
+                // Instantly remove from local state and local storage
                 const updatedList = availableProfiles.filter(p => p.userid !== pId);
                 setAvailableProfiles(updatedList);
                 localStorage.setItem('scamShieldProfileList', JSON.stringify(updatedList));
@@ -402,7 +440,6 @@
                         method: 'DELETE'
                     });
                     if (res.ok) {
-                        await fetchAvailableProfiles();
                         if (userId === pId) {
                             handleSwitchProfile("Default User");
                         }
@@ -1146,7 +1183,7 @@
                                                                     e.stopPropagation();
                                                                     handleDeleteProfile(prof.userid, prof.username);
                                                                 }}
-                                                                class="text-red-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                                class="text-red-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition-all opacity-70 hover:opacity-100 cursor-pointer"
                                                                 title="Delete Profile"
                                                             >
                                                                 🗑️
