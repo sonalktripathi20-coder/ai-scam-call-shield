@@ -288,6 +288,30 @@
                 return localStorage.getItem('scamShieldUserId') || 'default_user';
             });
             const [showProfileSelector, setShowProfileSelector] = useState(false);
+            const [availableProfiles, setAvailableProfiles] = useState([
+                { username: "Default User", userid: "default_user" },
+                { username: "Sonal Tripathi", userid: "sonal_tripathi" },
+                { username: "Vipin Verma", userid: "vipin_verma" },
+                { username: "Aman Malik", userid: "aman_malik" }
+            ]);
+
+            const fetchAvailableProfiles = async () => {
+                try {
+                    const res = await fetch('/api/user-profiles');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.length > 0) {
+                            setAvailableProfiles(data);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to load user profiles from backend:", e);
+                }
+            };
+
+            useEffect(() => {
+                fetchAvailableProfiles();
+            }, []);
 
             const handleSwitchProfile = (pName) => {
                 setUserName(pName);
@@ -297,6 +321,30 @@
                 localStorage.setItem('scamShieldUserId', pId);
                 setShowProfileSelector(false);
                 playChime(659, 0.1);
+            };
+
+            const handleCreateCustomProfile = async (customName) => {
+                if (!customName || !customName.trim()) return;
+                const trimmed = customName.trim();
+                try {
+                    const res = await fetch('/api/user-profiles', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username: trimmed })
+                    });
+                    if (res.ok) {
+                        const newProf = await res.json();
+                        await fetchAvailableProfiles();
+                        handleSwitchProfile(newProf.username);
+                    } else {
+                        handleSwitchProfile(trimmed);
+                    }
+                } catch (e) {
+                    console.error("Failed to register profile on backend:", e);
+                    handleSwitchProfile(trimmed);
+                }
             };
 
             // Main app navigation
@@ -1024,28 +1072,25 @@
                                             <span>SWITCH PROFILE</span>
                                             <span class="text-[7px] text-shieldBlue">ISOLATED MODE</span>
                                         </div>
-                                        {['Default User', 'Sonal Tripathi', 'Vipin Verma', 'Aman Malik'].map(pName => {
-                                            const pId = pName.toLowerCase().replace(/\s+/g, '_');
-                                            return (
-                                                <button
-                                                    key={pName}
-                                                    onClick={() => handleSwitchProfile(pName)}
-                                                    class={`px-2 py-1.5 rounded-lg text-left text-xs transition-all flex items-center justify-between ${userName === pName ? 'bg-shieldBlue/15 text-shieldBlue font-extrabold' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'}`}
-                                                >
-                                                    <div class="flex flex-col">
-                                                        <span>{pName}</span>
-                                                        <span class="text-[7px] text-slate-500 font-mono">{pId}</span>
-                                                    </div>
-                                                    {userName === pName && <span class="text-shieldBlue">✓</span>}
-                                                </button>
-                                            );
-                                        })}
+                                        {availableProfiles.map(prof => (
+                                            <button
+                                                key={prof.userid}
+                                                onClick={() => handleSwitchProfile(prof.username)}
+                                                class={`px-2 py-1.5 rounded-lg text-left text-xs transition-all flex items-center justify-between ${userId === prof.userid ? 'bg-shieldBlue/15 text-shieldBlue font-extrabold' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'}`}
+                                            >
+                                                <div class="flex flex-col">
+                                                    <span>{prof.username}</span>
+                                                    <span class="text-[7px] text-slate-500 font-mono">{prof.userid}</span>
+                                                </div>
+                                                {userId === prof.userid && <span class="text-shieldBlue">✓</span>}
+                                            </button>
+                                        ))}
                                         <div class="border-t border-darkBorder/60 my-1"></div>
                                         <button
                                             onClick={() => {
                                                 const customName = prompt("Enter new profile/session name (e.g. Friend A):");
                                                 if (customName && customName.trim()) {
-                                                    handleSwitchProfile(customName.trim());
+                                                    handleCreateCustomProfile(customName);
                                                 }
                                             }}
                                             class="px-2 py-2 rounded-lg text-left text-xs text-shieldBlue hover:bg-slate-900/60 font-black transition-all flex items-center gap-1.5"

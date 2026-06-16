@@ -895,6 +895,59 @@ def delete_voice_profile(profile_id: int, db: Session = Depends(get_db), user_id
 
 
 # ─────────────────────────────────────────────
+# User Isolation Profiles API
+# ─────────────────────────────────────────────
+class UserProfileCreate(BaseModel):
+    username: str
+
+
+@app.get("/api/user-profiles")
+def list_user_profiles(db: Session = Depends(get_db)):
+    """Fetch all registered user sessions/profiles."""
+    try:
+        from database import UserProfile
+        profiles = db.query(UserProfile).all()
+        if not profiles:
+            return [
+                {"username": "Default User", "userid": "default_user"},
+                {"username": "Sonal Tripathi", "userid": "sonal_tripathi"},
+                {"username": "Vipin Verma", "userid": "vipin_verma"},
+                {"username": "Aman Malik", "userid": "aman_malik"}
+            ]
+        return [{"username": p.username, "userid": p.userid} for p in profiles]
+    except Exception as e:
+        print(f"[WARN] Failed to get user profiles: {e}")
+        db.rollback()
+        return [
+            {"username": "Default User", "userid": "default_user"},
+            {"username": "Sonal Tripathi", "userid": "sonal_tripathi"},
+            {"username": "Vipin Verma", "userid": "vipin_verma"},
+            {"username": "Aman Malik", "userid": "aman_malik"}
+        ]
+
+
+@app.post("/api/user-profiles")
+def create_user_profile(body: UserProfileCreate, db: Session = Depends(get_db)):
+    """Register a new user profile/session name."""
+    try:
+        from database import UserProfile
+        userid = body.username.strip().lower().replace(" ", "_")
+        existing = db.query(UserProfile).filter_by(userid=userid).first()
+        if existing:
+            return {"username": existing.username, "userid": existing.userid}
+            
+        profile = UserProfile(username=body.username.strip(), userid=userid)
+        db.add(profile)
+        db.commit()
+        db.refresh(profile)
+        return {"username": profile.username, "userid": profile.userid}
+    except Exception as e:
+        print(f"[WARN] Failed to create user profile: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─────────────────────────────────────────────
 # Reputation Database & Scam Reporting API
 # ─────────────────────────────────────────────
 class SpamReportRequest(BaseModel):

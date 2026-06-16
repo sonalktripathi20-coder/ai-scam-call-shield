@@ -151,6 +151,14 @@ class VoiceProfile(Base):
     audio_data = Column(Text, nullable=True)
 
 
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    id       = Column(Integer, primary_key=True, index=True)
+    username = Column(String(64), unique=True, index=True, nullable=False)
+    userid   = Column(String(64), unique=True, index=True, nullable=False)
+
+
 class ReputationReport(Base):
     """Stores spam flags and reputation details for incoming phone numbers."""
     __tablename__ = "reputation_reports"
@@ -174,9 +182,17 @@ def init_db():
             # Force schema validation to trigger OperationalError on mismatch
             db.query(CallSession).first()
             db.query(VoiceProfile).first()
+            db.query(UserProfile).first()
             
             if not db.query(AppSettings).filter_by(user_id="default_user").first():
                 db.add(AppSettings(user_id="default_user"))
+                db.commit()
+
+            if not db.query(UserProfile).first():
+                db.add(UserProfile(username="Default User", userid="default_user"))
+                db.add(UserProfile(username="Sonal Tripathi", userid="sonal_tripathi"))
+                db.add(UserProfile(username="Vipin Verma", userid="vipin_verma"))
+                db.add(UserProfile(username="Aman Malik", userid="aman_malik"))
                 db.commit()
                 
             if not db.query(VoiceProfile).filter_by(user_id="default_user").first():
@@ -214,6 +230,10 @@ def init_db():
         db = SessionLocal()
         try:
             db.add(AppSettings(user_id="default_user"))
+            db.add(UserProfile(username="Default User", userid="default_user"))
+            db.add(UserProfile(username="Sonal Tripathi", userid="sonal_tripathi"))
+            db.add(UserProfile(username="Vipin Verma", userid="vipin_verma"))
+            db.add(UserProfile(username="Aman Malik", userid="aman_malik"))
             db.add(VoiceProfile(
                 user_id="default_user",
                 name="Sonal Tripathi",
