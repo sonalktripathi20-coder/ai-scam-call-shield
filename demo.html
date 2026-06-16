@@ -97,7 +97,9 @@
     <div id="root"></div>
 
     <!-- React Application Code -->
-    <script type="text/babel" data-presets='[["react", {"runtime": "classic"}]]'>
+    <script type="text/babel" data-presets="env,react">
+        /** @jsxRuntime classic */
+        /** @jsx React.createElement */
         const { useState, useEffect, useRef } = React;
 
         // Custom SVG Icons
