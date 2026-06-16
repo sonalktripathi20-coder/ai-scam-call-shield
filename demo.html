@@ -289,16 +289,30 @@
             });
             const [showProfileSelector, setShowProfileSelector] = useState(false);
             const [availableProfiles, setAvailableProfiles] = useState(() => {
-                try {
-                    const saved = localStorage.getItem('scamShieldProfileList');
-                    if (saved) return JSON.parse(saved);
-                } catch(e) {}
-                return [
+                const defaultList = [
                     { username: "Default User", userid: "default_user" },
                     { username: "Sonal Tripathi", userid: "sonal_tripathi" },
                     { username: "Vipin Verma", userid: "vipin_verma" },
                     { username: "Aman Malik", userid: "aman_malik" }
                 ];
+                try {
+                    const saved = localStorage.getItem('scamShieldProfileList');
+                    if (saved) {
+                        const parsed = JSON.parse(saved);
+                        if (Array.isArray(parsed)) {
+                            return parsed.map(p => {
+                                if (typeof p === 'string') {
+                                    return { username: p, userid: p.toLowerCase().replace(/\s+/g, '_') };
+                                }
+                                if (p && p.username && p.userid) {
+                                    return p;
+                                }
+                                return null;
+                            }).filter(Boolean);
+                        }
+                    }
+                } catch(e) {}
+                return defaultList;
             });
 
             const fetchAvailableProfiles = async () => {
@@ -1101,35 +1115,39 @@
                                             <span>SWITCH PROFILE</span>
                                             <span class="text-[7px] text-shieldBlue">ISOLATED MODE</span>
                                         </div>
-                                        {availableProfiles.map(prof => (
-                                            <div
-                                                key={prof.userid}
-                                                class={`px-2 py-1 rounded-lg text-left text-xs transition-all flex items-center justify-between group ${userId === prof.userid ? 'bg-shieldBlue/15 text-shieldBlue font-extrabold' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'}`}
-                                            >
-                                                <button
-                                                    onClick={() => handleSwitchProfile(prof.username)}
-                                                    class="flex-1 text-left flex flex-col cursor-pointer"
+                                        {availableProfiles.map(prof => {
+                                            const isDefault = ['default_user', 'sonal_tripathi', 'vipin_verma', 'aman_malik'].includes(prof.userid);
+                                            const isSelected = userId === prof.userid;
+                                            return (
+                                                <div
+                                                    key={prof.userid}
+                                                    class={`px-2 py-1 rounded-lg text-left text-xs transition-all flex items-center justify-between group ${isSelected ? 'bg-shieldBlue/15 text-shieldBlue font-extrabold' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'}`}
                                                 >
-                                                    <span>{prof.username}</span>
-                                                    <span class="text-[7px] text-slate-500 font-mono">{prof.userid}</span>
-                                                </button>
-                                                <div class="flex items-center gap-1">
-                                                    {userId === prof.userid && <span class="text-shieldBlue mr-1">✓</span>}
-                                                    {!['default_user', 'sonal_tripathi', 'vipin_verma', 'aman_malik'].includes(prof.userid) && (
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDeleteProfile(prof.userid, prof.username);
-                                                            }}
-                                                            class="text-red-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
-                                                            title="Delete Profile"
-                                                        >
-                                                            🗑️
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        onClick={() => handleSwitchProfile(prof.username)}
+                                                        class="flex-1 text-left flex flex-col cursor-pointer"
+                                                    >
+                                                        <span>{prof.username}</span>
+                                                        <span class="text-[7px] text-slate-500 font-mono">{prof.userid}</span>
+                                                    </button>
+                                                    <div class="flex items-center gap-1">
+                                                        {isSelected && <span class="text-shieldBlue mr-1">✓</span>}
+                                                        {!isDefault && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDeleteProfile(prof.userid, prof.username);
+                                                                }}
+                                                                class="text-red-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                                title="Delete Profile"
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                         <div class="border-t border-darkBorder/60 my-1"></div>
                                         <button
                                             onClick={() => {
