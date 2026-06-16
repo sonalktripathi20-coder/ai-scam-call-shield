@@ -347,6 +347,35 @@
                 }
             };
 
+            const handleDeleteProfile = async (pId, pName) => {
+                if (['default_user', 'sonal_tripathi', 'vipin_verma', 'aman_malik'].includes(pId)) {
+                    alert("Cannot delete default profiles.");
+                    return;
+                }
+                if (!confirm(`Are you sure you want to delete profile "${pName}"? This will also clear all voice recordings and settings for this profile.`)) {
+                    return;
+                }
+                
+                // Update local storage list as offline fallback
+                const updatedList = availableProfiles.filter(p => p.userid !== pId);
+                setAvailableProfiles(updatedList);
+                localStorage.setItem('scamShieldProfileList', JSON.stringify(updatedList));
+
+                try {
+                    const res = await fetch(`/api/user-profiles/${pId}`, {
+                        method: 'DELETE'
+                    });
+                    if (res.ok) {
+                        await fetchAvailableProfiles();
+                        if (userId === pId) {
+                            handleSwitchProfile("Default User");
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to delete profile from backend:", e);
+                }
+            };
+
             // Main app navigation
             const [activeScreen, setActiveScreen] = useState('dashboard'); // 'dashboard' | 'live' | 'reports' | 'profiles' | 'architecture' | 'settings'
 
@@ -1073,17 +1102,33 @@
                                             <span class="text-[7px] text-shieldBlue">ISOLATED MODE</span>
                                         </div>
                                         {availableProfiles.map(prof => (
-                                            <button
+                                            <div
                                                 key={prof.userid}
-                                                onClick={() => handleSwitchProfile(prof.username)}
-                                                class={`px-2 py-1.5 rounded-lg text-left text-xs transition-all flex items-center justify-between ${userId === prof.userid ? 'bg-shieldBlue/15 text-shieldBlue font-extrabold' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'}`}
+                                                class={`px-2 py-1 rounded-lg text-left text-xs transition-all flex items-center justify-between group ${userId === prof.userid ? 'bg-shieldBlue/15 text-shieldBlue font-extrabold' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'}`}
                                             >
-                                                <div class="flex flex-col">
+                                                <button
+                                                    onClick={() => handleSwitchProfile(prof.username)}
+                                                    class="flex-1 text-left flex flex-col cursor-pointer"
+                                                >
                                                     <span>{prof.username}</span>
                                                     <span class="text-[7px] text-slate-500 font-mono">{prof.userid}</span>
+                                                </button>
+                                                <div class="flex items-center gap-1">
+                                                    {userId === prof.userid && <span class="text-shieldBlue mr-1">✓</span>}
+                                                    {!['default_user', 'sonal_tripathi', 'vipin_verma', 'aman_malik'].includes(prof.userid) && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleDeleteProfile(prof.userid, prof.username);
+                                                            }}
+                                                            class="text-red-500 hover:text-red-400 p-1 rounded hover:bg-slate-800 transition-all opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                            title="Delete Profile"
+                                                        >
+                                                            🗑️
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                {userId === prof.userid && <span class="text-shieldBlue">✓</span>}
-                                            </button>
+                                            </div>
                                         ))}
                                         <div class="border-t border-darkBorder/60 my-1"></div>
                                         <button

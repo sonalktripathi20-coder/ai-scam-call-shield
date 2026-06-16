@@ -946,6 +946,32 @@ def create_user_profile(body: UserProfileCreate, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.delete("/api/user-profiles/{userid}")
+def delete_user_profile(userid: str, db: Session = Depends(get_db)):
+    """Delete a user profile and clean up associated voice profiles, call logs, etc."""
+    try:
+        from database import UserProfile, VoiceProfile, CallSession, SavedContact
+        # Check if it's a default profile we shouldn't delete
+        if userid in ["default_user", "sonal_tripathi", "vipin_verma", "aman_malik"]:
+            raise HTTPException(status_code=400, detail="Cannot delete default system profiles.")
+            
+        profile = db.query(UserProfile).filter_by(userid=userid).first()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Profile not found")
+            
+        # Clean up database records matching this user_id
+        db.query(VoiceProfile).filter_by(user_id=userid).delete()
+        db.query(SavedContact).filter_by(user_id=userid).delete()
+        db.delete(profile)
+        db.commit()
+        return {"status": "deleted", "userid": userid}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[WARN] Failed to delete profile: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ─────────────────────────────────────────────
 # Reputation Database & Scam Reporting API
