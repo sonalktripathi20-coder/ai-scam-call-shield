@@ -170,6 +170,9 @@
                         <line x1="5" y1="12" x2="19" y2="12" />
                         <polyline points="12 5 19 12 12 19" />
                     </>
+                ),
+                chevronDown: (
+                    <polyline points="6 9 12 15 18 9" />
                 )
             };
 
@@ -277,6 +280,25 @@
         };
 
         function App() {
+            // User Isolation States
+            const [userName, setUserName] = useState(() => {
+                return localStorage.getItem('scamShieldUserName') || 'Default User';
+            });
+            const [userId, setUserId] = useState(() => {
+                return localStorage.getItem('scamShieldUserId') || 'default_user';
+            });
+            const [showProfileSelector, setShowProfileSelector] = useState(false);
+
+            const handleSwitchProfile = (pName) => {
+                setUserName(pName);
+                const pId = pName.toLowerCase().replace(/\s+/g, '_');
+                setUserId(pId);
+                localStorage.setItem('scamShieldUserName', pName);
+                localStorage.setItem('scamShieldUserId', pId);
+                setShowProfileSelector(false);
+                playChime(659, 0.1);
+            };
+
             // Main app navigation
             const [activeScreen, setActiveScreen] = useState('dashboard'); // 'dashboard' | 'live' | 'reports' | 'profiles' | 'architecture' | 'settings'
 
@@ -307,7 +329,11 @@
             const [trustedProfiles, setTrustedProfiles] = useState([]);
 
             useEffect(() => {
-                fetch('/api/voice-profiles')
+                fetch('/api/voice-profiles', {
+                    headers: {
+                        'x-user-id': userId
+                    }
+                })
                     .then(res => res.json())
                     .then(data => {
                         if (Array.isArray(data)) {
@@ -315,13 +341,14 @@
                         }
                     })
                     .catch(err => console.error("Error loading voice profiles:", err));
-            }, []);
+            }, [userId]);
             const [newProfileName, setNewProfileName] = useState('');
             const [newProfilePhone, setNewProfilePhone] = useState('');
             const [newProfileRole, setNewProfileRole] = useState('Son');
             const [enrollState, setEnrollState] = useState('idle'); // 'idle' | 'loading' | 'success'
             const [enrollProgress, setEnrollProgress] = useState('');
             const [enrollProgressPercent, setEnrollProgressPercent] = useState(0);
+            const [voiceMatchStatus, setVoiceMatchStatus] = useState('idle'); // 'idle' | 'analyzing' | 'matching' | 'mismatch' | 'blocked'
 
             // Live Recording & Upload States
             const [voiceInputMethod, setVoiceInputMethod] = useState('upload'); // 'upload' | 'record'
@@ -331,17 +358,208 @@
             const [playbackUrl, setPlaybackUrl] = useState(null);
             const [isPlayingBack, setIsPlayingBack] = useState(false);
             const [selectedFileName, setSelectedFileName] = useState('');
+            const [currentVoiceBase64, setCurrentVoiceBase64] = useState(null);
+            const [playingProfileId, setPlayingProfileId] = useState(null);
 
             const mediaRecorderRef = useRef(null);
+            const profileAudioRef = useRef(null);
             const audioChunksRef = useRef([]);
             const recordingIntervalRef = useRef(null);
             const audioPlayerRef = useRef(null);
 
-            // Diagnostics State
-            const [diagState, setDiagState] = useState('idle'); // 'idle' | 'running' | 'done'
-            const [diagLogs, setDiagLogs] = useState([]);
-            const [diagLatency, setDiagLatency] = useState({ db: 0, pytorch: 0, randomforest: 0, stt: 0, api: 0 });
-            const [diagReadiness, setDiagReadiness] = useState(0);
+
+
+            // AI Scam Intercept Simulation Scenarios
+            const [selectedScenario, setSelectedScenario] = useState('otp');
+            const [simulatedStep, setSimulatedStep] = useState(7);
+            const [isSimulating, setIsSimulating] = useState(false);
+
+            const scenarios = {
+                otp: {
+                    name: 'Bank OTP Scam Call',
+                    icon: 'phone-incoming',
+                    color: 'shieldRed',
+                    caller: {
+                        number: '+91 90123 45678',
+                        badge: 'Unknown Caller',
+                        timestamp: 'Just now',
+                        status: 'Monitoring Active'
+                    },
+                    transcript: 'Sir, your SBI account will be blocked. Please share the OTP immediately.',
+                    language: 'English / Hindi',
+                    keywords: ['OTP', 'SBI Bank', 'Blocked', 'Immediately'],
+                    voice: {
+                        label: 'Normal Human Speech',
+                        confidence: '96%',
+                        indicator: 'Natural voice pattern (Non-cloned)',
+                        status: 'natural'
+                    },
+                    patterns: [
+                        { name: 'OTP Request', status: 'scam' },
+                        { name: 'Bank Keywords', status: 'scam' },
+                        { name: 'Urgency Language', status: 'scam' },
+                        { name: 'Money Request', status: 'none' }
+                    ],
+                    reputation: {
+                        reports: '48 User Spam Reports',
+                        confidence: 'Extreme risk history',
+                        age: '3 days old',
+                        frequency: '120 calls/hr'
+                    },
+                    fusion: {
+                        voice: '0.04',
+                        intent: '0.95',
+                        metadata: '0.90',
+                        finalScore: 94,
+                        level: 'HIGH'
+                    },
+                    explain: [
+                        'OTP verification requested during phone conversation.',
+                        'Highly urgent and account-blocking threats detected.',
+                        'Caller phone number has 48 previous spam flags in central database.'
+                    ],
+                    timeline: [
+                        { time: '0s', event: 'Unknown call received from +91 90123 45678' },
+                        { time: '3s', event: 'Bank keywords ("SBI Bank") detected in speech stream' },
+                        { time: '7s', event: 'Direct OTP request detected ("share the OTP")' },
+                        { time: '11s', event: 'Urgent compliance language ("immediately blocked") identified' },
+                        { time: '15s', event: 'AI multi-modal score calculated at 94%' },
+                        { time: '16s', event: 'Active carrier interception warning triggered' }
+                    ]
+                },
+                clone: {
+                    name: 'AI Voice Clone Ransom',
+                    icon: 'users',
+                    color: 'shieldOrange',
+                    caller: {
+                        number: '+91 88877 66554',
+                        badge: 'Spoofed Caller ID',
+                        timestamp: 'Just now',
+                        status: 'Intercepting Cloned Frame'
+                    },
+                    transcript: 'Papa, main Sonal bol rahi hoon. Mujhe urgently paise chahiye.',
+                    language: 'Hindi',
+                    keywords: ['Papa', 'Urgently', 'Paise', 'Chahiye'],
+                    voice: {
+                        label: 'Possible AI Voice Clone',
+                        confidence: '91%',
+                        indicator: 'High-frequency spectral cloning artifacts matched',
+                        status: 'clone'
+                    },
+                    patterns: [
+                        { name: 'Claims Family Identity', status: 'scam' },
+                        { name: 'Unknown Number', status: 'scam' },
+                        { name: 'Money Request', status: 'scam' },
+                        { name: 'Voice Clone Indicators', status: 'scam' }
+                    ],
+                    reputation: {
+                        reports: '1 Spam Report',
+                        confidence: 'New suspect VoIP line',
+                        age: '1 day old',
+                        frequency: '1 call/hr'
+                    },
+                    fusion: {
+                        voice: '0.96',
+                        intent: '0.88',
+                        metadata: '0.30',
+                        finalScore: 96,
+                        level: 'CRITICAL'
+                    },
+                    explain: [
+                        'Impersonation check failed: Synthesized AI clone matching family print.',
+                        'Financial distress/money transfer requested under extreme urgency.',
+                        'Unknown number claiming relationship name ("Papa").'
+                    ],
+                    timeline: [
+                        { time: '0s', event: 'Inbound caller claims daughter identity ("Sonal")' },
+                        { time: '2s', event: 'Voice authenticity engine flags spectral anomalies (AI clone probability 91%)' },
+                        { time: '5s', event: 'Urgent financial transfer request detected ("paise chahiye")' },
+                        { time: '9s', event: 'Deepfake biometric signature match confirmed' },
+                        { time: '12s', event: 'Risk assessment engine aggregates score to 96%' },
+                        { time: '14s', event: 'Security alert dispatched to trusted family desk' }
+                    ]
+                },
+                safe: {
+                    name: 'Safe Call (Delivery)',
+                    icon: 'check-circle',
+                    color: 'shieldGreen',
+                    caller: {
+                        number: '+91 98765 43210',
+                        badge: 'Unlisted Number',
+                        timestamp: '2 mins ago',
+                        status: 'Monitoring Suspended (Safe)'
+                    },
+                    transcript: 'Hello sir, your Amazon parcel is at the gate.',
+                    language: 'English',
+                    keywords: ['Parcel', 'Amazon', 'Gate'],
+                    voice: {
+                        label: 'Normal Human Speech',
+                        confidence: '82%',
+                        indicator: 'Clean acoustic spectrum validated',
+                        status: 'natural'
+                    },
+                    patterns: [
+                        { name: 'Unknown Number', status: 'safe' },
+                        { name: 'Delivery Context', status: 'safe' },
+                        { name: 'OTP Request', status: 'none' },
+                        { name: 'Urgency Language', status: 'none' },
+                        { name: 'Money Request', status: 'none' }
+                    ],
+                    reputation: {
+                        reports: '0 Spam Reports',
+                        confidence: 'Reputable logistics route',
+                        age: '3 years old',
+                        frequency: '2 calls/day'
+                    },
+                    fusion: {
+                        voice: '0.01',
+                        intent: '0.05',
+                        metadata: '0.02',
+                        finalScore: 8,
+                        level: 'LOW'
+                    },
+                    explain: [
+                        'Safe logistics keywords identified ("Amazon parcel").',
+                        'No money request, high pressure, or credentials query detected.',
+                        'Natural vocal profile with zero risk indicators.'
+                    ],
+                    timeline: [
+                        { time: '0s', event: 'Call received from logistics provider contact' },
+                        { time: '4s', event: 'Speech keywords matched standard courier template' },
+                        { time: '8s', event: 'Voice authentication validated as clean human pitch' },
+                        { time: '12s', event: 'Zero scam signals detected. System marks call SAFE' }
+                    ]
+                }
+            };
+
+            const startPipelineSimulation = (scenarioId) => {
+                if (isSimulating) return;
+                setSelectedScenario(scenarioId);
+                setIsSimulating(true);
+                setSimulatedStep(0);
+                
+                let currentStep = 0;
+                playChime(523, 0.08);
+                
+                const interval = setInterval(() => {
+                    currentStep += 1;
+                    setSimulatedStep(currentStep);
+                    
+                    if (currentStep < 7) {
+                        playChime(523 + currentStep * 60, 0.05);
+                    } else {
+                        if (scenarioId === 'safe') {
+                            playChime(880, 0.25);
+                        } else if (scenarioId === 'clone') {
+                            playChime(370, 0.45);
+                        } else {
+                            playChime(330, 0.45);
+                        }
+                        clearInterval(interval);
+                        setIsSimulating(false);
+                    }
+                }, 700);
+            };
 
             // Voice Recording Handlers
             const startRecording = async () => {
@@ -362,6 +580,13 @@
                         setRecordedBlob(audioBlob);
                         const url = URL.createObjectURL(audioBlob);
                         setPlaybackUrl(url);
+                        
+                        const reader = new FileReader();
+                        reader.readAsDataURL(audioBlob);
+                        reader.onloadend = () => {
+                            setCurrentVoiceBase64(reader.result);
+                        };
+                        
                         stream.getTracks().forEach(track => track.stop());
                     };
 
@@ -393,7 +618,12 @@
 
             const togglePlayback = () => {
                 if (!playbackUrl) return;
-                if (!audioPlayerRef.current) {
+                
+                // Recreate if not initialized or if URL changed
+                if (!audioPlayerRef.current || audioPlayerRef.current.src !== playbackUrl) {
+                    if (audioPlayerRef.current) {
+                        audioPlayerRef.current.pause();
+                    }
                     audioPlayerRef.current = new Audio(playbackUrl);
                     audioPlayerRef.current.onended = () => {
                         setIsPlayingBack(false);
@@ -475,12 +705,16 @@
                         hash: `${randHash.substring(0, 4)}...${randHash.substring(randHash.length - 4)}`,
                         status: 'Voice Authenticated',
                         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                        features: `Pitch: ${randPitch}Hz, HNR: ${randHNR}dB`
+                        features: `Pitch: ${randPitch}Hz, HNR: ${randHNR}dB`,
+                        audio_data: currentVoiceBase64
                     };
 
                     fetch('/api/voice-profiles', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'x-user-id': userId
+                        },
                         body: JSON.stringify(newProfile)
                     })
                     .then(res => {
@@ -490,6 +724,7 @@
                     .then(dbProfile => {
                         setTrustedProfiles(prev => [...prev, dbProfile]);
                         setEnrollState('success');
+                        setCurrentVoiceBase64(null);
                         
                         // Reset
                         setNewProfileName('');
@@ -512,46 +747,53 @@
                 }, 8000);
             };
 
-            // Diagnostic Telemetry Pipeline
-            const handleRunDiagnostics = () => {
-                if (diagState === 'running') return;
-                setDiagState('running');
-                setDiagLogs(['[INFO] Initiating global interceptor health diagnostics...']);
-                setDiagLatency({ db: 0, pytorch: 0, randomforest: 0, stt: 0, api: 0 });
-                playChime(660, 0.15);
+            const playProfileVoice = (profile) => {
+                if (playingProfileId === profile.id) {
+                    if (profileAudioRef.current) {
+                        profileAudioRef.current.pause();
+                        profileAudioRef.current = null;
+                    }
+                    window.speechSynthesis.cancel();
+                    setPlayingProfileId(null);
+                    return;
+                }
 
-                setTimeout(() => {
-                    setDiagLatency(prev => ({ ...prev, db: Math.floor(10 + Math.random() * 15) }));
-                    setDiagLogs(prev => [...prev, '[INFO] Testing database write integrity: Success (Commit duration 3.2ms)', '[INFO] DB status: ONLINE. WAL mode active.']);
-                    playChime(700, 0.05);
-                }, 1000);
+                if (profileAudioRef.current) {
+                    profileAudioRef.current.pause();
+                    profileAudioRef.current = null;
+                }
+                window.speechSynthesis.cancel();
 
-                setTimeout(() => {
-                    setDiagLatency(prev => ({ ...prev, pytorch: Math.floor(60 + Math.random() * 30) }));
-                    setDiagLogs(prev => [...prev, '[INFO] Verifying PyTorch Deepfake model (ai_voice_model.pth) weights...', '[INFO] PyTorch: READY (accuracy validation matches baseline 100%).']);
-                    playChime(750, 0.05);
-                }, 2000);
+                // Check for custom audioURL or database audio_data
+                const audioSource = profile.audioUrl || profile.audio_data;
 
-                setTimeout(() => {
-                    setDiagLatency(prev => ({ ...prev, randomforest: Math.floor(5 + Math.random() * 8) }));
-                    setDiagLogs(prev => [...prev, '[INFO] Checking Random Forest signature classifier (ai_voice_detector.pkl)...', '[INFO] Random Forest: READY. Model mapped to 17 acoustic dimensions.']);
-                    playChime(800, 0.05);
-                }, 3000);
-
-                setTimeout(() => {
-                    setDiagLatency(prev => ({ ...prev, stt: Math.floor(120 + Math.random() * 50), api: Math.floor(15 + Math.random() * 20) }));
-                    setDiagLogs(prev => [
-                        ...prev, 
-                        '[INFO] Testing Whisper Speech-to-Text local decoder loops...', 
-                        '[INFO] STT: READY. Latency calibrated at 140ms/sec audio frame.', 
-                        '[INFO] Verifying Twilio media stream WebSockets redirect...', 
-                        '[SUCCESS] Diagnostics complete. Threat interception shield is fully armed & 100% operational.'
-                    ]);
-                    setDiagReadiness((98.5 + Math.random() * 1.4).toFixed(1));
-                    setDiagState('done');
-                    playChime(880, 0.3);
-                }, 4000);
+                if (audioSource) {
+                    profileAudioRef.current = new Audio(audioSource);
+                    profileAudioRef.current.onended = () => {
+                        setPlayingProfileId(null);
+                    };
+                    profileAudioRef.current.onerror = () => {
+                        setPlayingProfileId(null);
+                        alert("Could not load enrolled voice sample.");
+                    };
+                    profileAudioRef.current.play();
+                    setPlayingProfileId(profile.id);
+                } else {
+                    const utterance = new SpeechSynthesisUtterance(
+                        `Biometric signature validation. Enrolled voiceprint verification pattern for ${profile.name}, registered as ${profile.role}.`
+                    );
+                    utterance.onend = () => {
+                        setPlayingProfileId(null);
+                    };
+                    utterance.onerror = () => {
+                        setPlayingProfileId(null);
+                    };
+                    window.speechSynthesis.speak(utterance);
+                    setPlayingProfileId(profile.id);
+                }
             };
+
+
 
             const handleSyncDatabase = () => {
                 if (dbSyncState === 'syncing' || dbSyncState === 'synced') return;
@@ -607,6 +849,11 @@
                 setSimScore(15);
                 setSimActiveIndicators(["Unknown Number"]);
                 playChime(659, 0.15); // E5 answer
+                if (simKey === 'voice_clone') {
+                    setVoiceMatchStatus('analyzing');
+                } else {
+                    setVoiceMatchStatus('idle');
+                }
             };
 
             // Dialogue simulation loop
@@ -622,7 +869,10 @@
                         // Update metrics dynamically
                         const progress = (simLineIndex + 1) / scenario.dialogue.length;
                         const targetScore = scenario.score;
-                        const currentScore = Math.min(100, Math.round(progress * targetScore));
+                        let currentScore = Math.min(100, Math.round(progress * targetScore));
+                        if (simKey === 'voice_clone' && simLineIndex >= 2) {
+                            currentScore = 98; // Mismatch makes it critical instantly!
+                        }
                         setSimScore(currentScore);
 
                         // Set risk levels
@@ -652,8 +902,26 @@
                         setSimActiveIndicators(prev => Array.from(new Set([...prev, ...newIndicators])));
                         playChime(784, 0.1); // G5 stream tick
 
-                        // If risk hits alert threshold
-                        if (currentScore >= 75 && simLineIndex === scenario.dialogue.length - 1) {
+                        // Voice clone specific biometric verification states
+                        if (simKey === 'voice_clone') {
+                            if (simLineIndex === 0) {
+                                setVoiceMatchStatus('analyzing');
+                            } else if (simLineIndex === 1) {
+                                setVoiceMatchStatus('matching');
+                            } else if (simLineIndex === 2) {
+                                setVoiceMatchStatus('mismatch');
+                                playChime(880, 0.3); // High alarm chime
+                            } else if (simLineIndex === 3) {
+                                setVoiceMatchStatus('blocked');
+                                playChime(330, 0.4); // Disconnect chime
+                                setTimeout(() => {
+                                    blockAndSave();
+                                }, 1500);
+                            }
+                        }
+
+                        // If risk hits alert threshold (only for other scenarios; voice_clone auto-blocks)
+                        if (simKey !== 'voice_clone' && currentScore >= 75 && simLineIndex === scenario.dialogue.length - 1) {
                             setTimeout(() => {
                                 setSimState('alert');
                                 playChime(987, 0.4); // B5 alarm
@@ -697,13 +965,15 @@
                 setSimTranscript([]);
                 setSimScore(0);
                 setSimLineIndex(0);
+                setVoiceMatchStatus('idle');
             };
 
             return (
                 <div class="max-w-6xl mx-auto px-4 py-6 min-h-screen flex flex-col gap-6 relative z-10">
                     
                     {/* Header Shield Bar */}
-                    <header class="glass-panel rounded-2xl p-5 flex flex-col md:flex-row justify-between items-center gap-4 border-b border-darkBorder shadow-glowBlue">
+                    {/* Header Shield Bar */}
+                    <header class="glass-panel rounded-2xl p-5 flex flex-col lg:flex-row justify-between items-center gap-4 border-b border-darkBorder shadow-glowBlue">
                         <div class="flex items-center gap-3">
                             <div class="w-10 h-10 rounded-xl bg-shieldBlue/10 flex items-center justify-center border border-shieldBlue/30 text-shieldBlue animate-pulse">
                                 <Icon name="shield" className="w-6 h-6" />
@@ -716,30 +986,82 @@
                             </div>
                         </div>
 
-                        {/* Navigation Menu */}
-                        <nav class="flex flex-wrap gap-1.5 md:gap-3 bg-slate-900/60 p-1 rounded-xl border border-darkBorder">
-                            {[
-                                { id: 'dashboard', label: 'Dashboard', icon: 'shield' },
-                                { id: 'live', label: 'Live Shield', icon: 'phone' },
-                                { id: 'reports', label: 'Threat Reports', icon: 'history' },
-                                { id: 'profiles', label: 'Trusted Profiles', icon: 'users' },
-                                { id: 'architecture', label: 'System Architecture', icon: 'cpu' },
-                            ].map(item => (
+                        <div class="flex flex-wrap items-center gap-4">
+                            {/* Navigation Menu */}
+                            <nav class="flex flex-wrap gap-1.5 md:gap-3 bg-slate-900/60 p-1 rounded-xl border border-darkBorder">
+                                {[
+                                    { id: 'dashboard', label: 'Dashboard', icon: 'shield' },
+                                    { id: 'live', label: 'Live Shield', icon: 'phone' },
+                                    { id: 'reports', label: 'Threat Reports', icon: 'history' },
+                                    { id: 'profiles', label: 'Trusted Profiles', icon: 'users' },
+                                    { id: 'architecture', label: 'AI Detection Pipeline', icon: 'cpu' },
+                                ].map(item => (
+                                    <button 
+                                        key={item.id}
+                                        onClick={() => { setActiveScreen(item.id); resetSimulator(); }}
+                                        class={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${activeScreen === item.id ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/30' : 'text-slate-400 hover:text-slate-200'}`}
+                                    >
+                                        <Icon name={item.icon} className="w-3.5 h-3.5" />
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </nav>
+
+                            {/* User Profile Selector */}
+                            <div class="relative">
                                 <button 
-                                    key={item.id}
-                                    onClick={() => { setActiveScreen(item.id); resetSimulator(); }}
-                                    class={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${activeScreen === item.id ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/30' : 'text-slate-400 hover:text-slate-200'}`}
+                                    onClick={() => setShowProfileSelector(!showProfileSelector)}
+                                    class="px-3 py-1.5 bg-slate-950/80 hover:bg-slate-950 border border-darkBorder hover:border-shieldBlue/50 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
                                 >
-                                    <Icon name={item.icon} className="w-3.5 h-3.5" />
-                                    {item.label}
+                                    <span class="w-1.5 h-1.5 rounded-full bg-shieldGreen animate-pulse"></span>
+                                    <span>👤 {userName}</span>
+                                    <span class="text-[8px] text-slate-500 font-mono">({userId})</span>
+                                    <Icon name="chevronDown" className="w-3 h-3 text-slate-400" />
                                 </button>
-                            ))}
-                        </nav>
+                                {showProfileSelector && (
+                                    <div class="absolute right-0 mt-2 w-52 bg-slate-950 border border-darkBorder rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1">
+                                        <div class="text-[8px] font-bold text-slate-500 px-2 py-1 uppercase tracking-widest border-b border-darkBorder/60 pb-1.5 flex items-center justify-between">
+                                            <span>SWITCH PROFILE</span>
+                                            <span class="text-[7px] text-shieldBlue">ISOLATED MODE</span>
+                                        </div>
+                                        {['Default User', 'Sonal Tripathi', 'Vipin Verma', 'Aman Malik'].map(pName => {
+                                            const pId = pName.toLowerCase().replace(/\s+/g, '_');
+                                            return (
+                                                <button
+                                                    key={pName}
+                                                    onClick={() => handleSwitchProfile(pName)}
+                                                    class={`px-2 py-1.5 rounded-lg text-left text-xs transition-all flex items-center justify-between ${userName === pName ? 'bg-shieldBlue/15 text-shieldBlue font-extrabold' : 'text-slate-400 hover:bg-slate-900/60 hover:text-white'}`}
+                                                >
+                                                    <div class="flex flex-col">
+                                                        <span>{pName}</span>
+                                                        <span class="text-[7px] text-slate-500 font-mono">{pId}</span>
+                                                    </div>
+                                                    {userName === pName && <span class="text-shieldBlue">✓</span>}
+                                                </button>
+                                            );
+                                        })}
+                                        <div class="border-t border-darkBorder/60 my-1"></div>
+                                        <button
+                                            onClick={() => {
+                                                const customName = prompt("Enter new profile/session name (e.g. Friend A):");
+                                                if (customName && customName.trim()) {
+                                                    handleSwitchProfile(customName.trim());
+                                                }
+                                            }}
+                                            class="px-2 py-2 rounded-lg text-left text-xs text-shieldBlue hover:bg-slate-900/60 font-black transition-all flex items-center gap-1.5"
+                                        >
+                                            <span>➕ Create Custom Profile</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </header>
 
                     {/* SCREEN 1: MAIN PROTECTION DASHBOARD */}
                     {activeScreen === 'dashboard' && (() => {
-                        const score = 40 + (shieldActive ? 20 : 0) + (dbSyncState === 'synced' ? 20 : 0) + (hookVerifyState === 'verified' ? 20 : 0);
+                        const isVoiceVaultConfigured = trustedProfiles && trustedProfiles.length > 0;
+                        const score = 20 + (shieldActive ? 20 : 0) + (dbSyncState === 'synced' ? 20 : 0) + (hookVerifyState === 'verified' ? 20 : 0) + (isVoiceVaultConfigured ? 20 : 0);
                         return (
                             <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                                 
@@ -857,17 +1179,21 @@
                                                 {/* Task 4: Voice Vault Setup */}
                                                 <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl flex items-center justify-between">
                                                     <div class="flex items-center gap-3">
-                                                        <span class="text-sm text-slate-600">○</span>
+                                                        <span class={`text-sm ${isVoiceVaultConfigured ? 'text-shieldGreen' : 'text-slate-600'}`}>
+                                                            {isVoiceVaultConfigured ? '✓' : '○'}
+                                                        </span>
                                                         <div>
                                                             <div class="text-xs font-bold text-slate-200">Configure Trusted Family Voice Vault</div>
-                                                            <p class="text-[9px] text-slate-500">Register voiceprint to detect cloned relatives.</p>
+                                                            <p class="text-[9px] text-slate-500">
+                                                                {isVoiceVaultConfigured ? `Active (${trustedProfiles.length} voice profiles enrolled)` : 'Register voiceprint to detect cloned relatives.'}
+                                                            </p>
                                                         </div>
                                                     </div>
                                                     <button 
                                                         onClick={() => setActiveScreen('profiles')}
-                                                        class="px-3 py-1 rounded text-[10px] font-bold border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-300"
+                                                        class={`px-3 py-1 rounded text-[10px] font-bold border transition-all ${isVoiceVaultConfigured ? 'bg-shieldGreen/15 border-shieldGreen/30 text-shieldGreen' : 'bg-slate-900 border-slate-800 text-slate-300'}`}
                                                     >
-                                                        Set Up Voice
+                                                        {isVoiceVaultConfigured ? 'Manage Vault' : 'Set Up Voice'}
                                                     </button>
                                                 </div>
 
@@ -1066,6 +1392,11 @@
                                                     <h3 class="text-lg font-black text-white mt-2">
                                                         {SCENARIOS[simKey].caller}
                                                     </h3>
+                                                    {simKey === 'voice_clone' && (
+                                                        <div class="text-[9px] text-shieldBlue font-bold uppercase tracking-wide mt-1 bg-shieldBlue/10 px-2 py-0.5 rounded border border-shieldBlue/20 animate-pulse">
+                                                            👤 Claimed Identity: Sonal Tripathi (Son)
+                                                        </div>
+                                                    )}
                                                     <span class="text-[10px] text-slate-500 uppercase tracking-widest font-bold font-mono">Incoming Carrier Call</span>
                                                 </div>
 
@@ -1111,6 +1442,60 @@
                                                         {SCENARIOS[simKey].caller}
                                                     </div>
                                                 </div>
+
+                                                {/* Voice Vault Verification Widget */}
+                                                {simKey === 'voice_clone' && (
+                                                    <div class="bg-slate-950/80 border border-darkBorder rounded-xl p-3 flex flex-col gap-2 relative overflow-hidden">
+                                                        <div class="flex justify-between items-center border-b border-darkBorder/40 pb-1.5">
+                                                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                                                                <span class="w-2 h-2 rounded-full bg-shieldBlue animate-pulse"></span>
+                                                                Voice Vault Match
+                                                            </span>
+                                                            <span class={`text-[8px] font-bold px-1.5 py-0.2 rounded border uppercase font-mono ${
+                                                                voiceMatchStatus === 'analyzing' ? 'bg-shieldBlue/10 border-shieldBlue/30 text-shieldBlue animate-pulse' :
+                                                                voiceMatchStatus === 'matching' ? 'bg-shieldOrange/10 border-shieldOrange/30 text-shieldOrange animate-pulse' :
+                                                                voiceMatchStatus === 'mismatch' ? 'bg-shieldRed/15 border-shieldRed/30 text-shieldRed font-black animate-bounce shadow-glowRed' :
+                                                                voiceMatchStatus === 'blocked' ? 'bg-shieldRed/20 border-shieldRed/40 text-shieldRed font-black' :
+                                                                'bg-slate-800 border-slate-700 text-slate-500'
+                                                            }`}>
+                                                                {voiceMatchStatus === 'analyzing' ? 'Analyzing voice...' :
+                                                                 voiceMatchStatus === 'matching' ? 'Comparing biometrics...' :
+                                                                 voiceMatchStatus === 'mismatch' ? '❌ Biometric Mismatch' :
+                                                                 voiceMatchStatus === 'blocked' ? '🚫 Terminated' :
+                                                                 'Idle'}
+                                                            </span>
+                                                        </div>
+                                                        
+                                                        <div class="text-[9px] text-slate-300 flex flex-col gap-1 font-mono leading-relaxed">
+                                                            {voiceMatchStatus === 'analyzing' && (
+                                                                <>
+                                                                    <div>• Extracting fundamental frequencies...</div>
+                                                                    <div class="text-slate-500">• Harmonic mapping running...</div>
+                                                                </>
+                                                            )}
+                                                            {voiceMatchStatus === 'matching' && (
+                                                                <>
+                                                                    <div class="text-shieldGreen">• Pitch reference loaded: 142.4Hz</div>
+                                                                    <div>• Analyzing incoming pitch: 198.5Hz...</div>
+                                                                    <div class="text-slate-500">• HNR comparison in progress...</div>
+                                                                </>
+                                                            )}
+                                                            {voiceMatchStatus === 'mismatch' && (
+                                                                <>
+                                                                    <div class="text-shieldRed font-extrabold">• PITCH MISMATCH DETECTED (Δ 56.1Hz)</div>
+                                                                    <div class="text-shieldRed font-extrabold">• SYNTHETIC SPEECH PROBABILITY: 99.2%</div>
+                                                                    <div class="text-shieldOrange">• Vault Action: Flagging spoofing call</div>
+                                                                </>
+                                                            )}
+                                                            {voiceMatchStatus === 'blocked' && (
+                                                                <>
+                                                                    <div class="text-shieldRed font-black">• CALL BLOCKED AUTOMATICALLY</div>
+                                                                    <div class="text-slate-400">• Security log written to database</div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* Live Transcript Stream */}
                                                 <div class="flex-1 flex flex-col gap-2">
@@ -1239,6 +1624,12 @@
 
                                                 {/* Table-style summary */}
                                                 <div class="flex-1 bg-slate-950 border border-slate-900 rounded-xl p-3 overflow-y-auto flex flex-col gap-2.5 my-2">
+                                                    {simKey === 'voice_clone' && (
+                                                        <div class="text-[9px] bg-shieldRed/10 border border-shieldRed/30 p-2 rounded-lg text-shieldRed font-bold mb-2 leading-relaxed">
+                                                            🚫 VOICE VAULT SHIELD ACTIVE:
+                                                            Voice print characteristics (Pitch/HNR) did not match the enrolled profile of Sonal Tripathi.
+                                                        </div>
+                                                    )}
                                                     <div class="grid grid-cols-2 gap-2 text-[9px] border-b border-slate-900 pb-2">
                                                         <div>
                                                             <span class="text-slate-500 block">Caller Number</span>
@@ -1426,14 +1817,30 @@
                                                  <div class="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
                                                      <button 
                                                          type="button"
-                                                         onClick={() => setVoiceInputMethod('upload')}
+                                                         onClick={() => {
+                                                             setVoiceInputMethod('upload');
+                                                             if (audioPlayerRef.current) {
+                                                                 audioPlayerRef.current.pause();
+                                                                 audioPlayerRef.current = null;
+                                                             }
+                                                             setPlaybackUrl(null);
+                                                             setIsPlayingBack(false);
+                                                         }}
                                                          class={`px-2 py-0.5 text-[9px] rounded font-bold transition-all ${voiceInputMethod === 'upload' ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/20' : 'text-slate-500 hover:text-slate-300'}`}
                                                      >
                                                          File Upload
                                                      </button>
                                                      <button 
                                                          type="button"
-                                                         onClick={() => setVoiceInputMethod('record')}
+                                                         onClick={() => {
+                                                             setVoiceInputMethod('record');
+                                                             if (audioPlayerRef.current) {
+                                                                 audioPlayerRef.current.pause();
+                                                                 audioPlayerRef.current = null;
+                                                             }
+                                                             setPlaybackUrl(null);
+                                                             setIsPlayingBack(false);
+                                                         }}
                                                          class={`px-2 py-0.5 text-[9px] rounded font-bold transition-all ${voiceInputMethod === 'record' ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/20' : 'text-slate-500 hover:text-slate-300'}`}
                                                      >
                                                          Live Record
@@ -1442,7 +1849,7 @@
                                              </div>
 
                                              {voiceInputMethod === 'upload' ? (
-                                                 <div>
+                                                 <div class="flex flex-col gap-2">
                                                      <label class="w-full bg-slate-950 border border-slate-855 hover:border-slate-700 border-dashed rounded-lg py-2 px-2 text-center text-slate-400 hover:text-slate-300 cursor-pointer block text-[10px] font-semibold truncate transition-all">
                                                          {selectedFileName ? `📁 ${selectedFileName}` : '📁 Upload WAV/MP3 Voice Sample'}
                                                          <input 
@@ -1452,11 +1859,42 @@
                                                              disabled={enrollState === 'loading'} 
                                                              onChange={(e) => {
                                                                  if(e.target.files && e.target.files[0]) {
-                                                                     setSelectedFileName(e.target.files[0].name);
+                                                                     const file = e.target.files[0];
+                                                                     setSelectedFileName(file.name);
+                                                                     const url = URL.createObjectURL(file);
+                                                                     setPlaybackUrl(url);
+                                                                     
+                                                                     const reader = new FileReader();
+                                                                     reader.readAsDataURL(file);
+                                                                     reader.onloadend = () => {
+                                                                         setCurrentVoiceBase64(reader.result);
+                                                                     };
                                                                  }
                                                              }}
                                                          />
                                                      </label>
+                                                     {playbackUrl && (
+                                                         <div class="flex items-center justify-center gap-2 mt-1">
+                                                             <button 
+                                                                 type="button"
+                                                                 onClick={togglePlayback}
+                                                                 class={`px-2.5 py-1 text-[9px] font-bold rounded-lg transition-all flex items-center gap-1 ${isPlayingBack ? 'bg-shieldOrange/20 border border-shieldOrange/30 text-shieldOrange' : 'bg-shieldGreen/15 border border-shieldGreen/30 text-shieldGreen'}`}
+                                                             >
+                                                                 {isPlayingBack ? '⏸ Pause' : '🔊 Play Audio'}
+                                                             </button>
+                                                             <button 
+                                                                 type="button"
+                                                                 onClick={() => {
+                                                                     setSelectedFileName('');
+                                                                     setPlaybackUrl(null);
+                                                                     setIsPlayingBack(false);
+                                                                 }}
+                                                                 class="px-2 py-1 bg-slate-900 hover:bg-slate-855 border border-slate-800 text-[9px] font-bold rounded-lg text-slate-400 hover:text-slate-305 transition-all"
+                                                             >
+                                                                 🗑 Reset
+                                                             </button>
+                                                         </div>
+                                                     )}
                                                  </div>
                                              ) : (
                                                  <div class="bg-slate-950 border border-slate-900 rounded-lg p-2.5 flex flex-col items-center justify-center gap-2 relative overflow-hidden">
@@ -1593,11 +2031,25 @@
                                                      </div>
                                                  </div>
                                                  <div class="flex justify-between items-center text-[9px] text-slate-500 font-mono pt-1">
-                                                     <span>Added: {profile.date}</span>
+                                                     <div class="flex items-center gap-2">
+                                                         <button
+                                                             type="button"
+                                                             onClick={() => playProfileVoice(profile)}
+                                                             class={`px-2 py-0.5 rounded text-[8px] font-bold border transition-all ${playingProfileId === profile.id ? 'bg-shieldOrange/20 border-shieldOrange/30 text-shieldOrange' : 'bg-shieldGreen/10 border-shieldGreen/20 text-shieldGreen hover:bg-shieldGreen/20'}`}
+                                                         >
+                                                             {playingProfileId === profile.id ? '⏸ Stop' : '🔊 Listen'}
+                                                         </button>
+                                                         <span>Added: {profile.date}</span>
+                                                     </div>
                                                      <button 
                                                          onClick={() => {
                                                              if(profile.id <= 2) return alert("System protected profiles cannot be deleted.");
-                                                             fetch(`/api/voice-profiles/${profile.id}`, { method: 'DELETE' })
+                                                             fetch(`/api/voice-profiles/${profile.id}`, { 
+                                                                 method: 'DELETE',
+                                                                 headers: {
+                                                                     'x-user-id': userId
+                                                                 }
+                                                             })
                                                                  .then(res => {
                                                                      if(res.ok) {
                                                                          setTrustedProfiles(prev => prev.filter(p => p.id !== profile.id));
@@ -1621,180 +2073,350 @@
                      )}
 
                     {/* SCREEN: SYSTEM ARCHITECTURE (ENGINEERING BACKEND DETAILS) */}
-                    {activeScreen === 'architecture' && (
-                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-6">
-                            
-                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-darkBorder pb-3 gap-3">
-                                <div>
-                                    <h2 class="text-md font-extrabold text-white tracking-wider flex items-center gap-2">
-                                        <Icon name="cpu" className="w-5 h-5 text-shieldBlue" />
-                                        SYSTEM ARCHITECTURE & TELEMETRY MONITOR
-                                    </h2>
-                                    <p class="text-[10px] text-slate-500 font-semibold mt-0.5 font-mono">
-                                        Status: {diagState === 'running' ? 'Running Diagnostic Calibration...' : diagState === 'done' ? 'All Engines Operational (100% Armed)' : 'Diagnostics Standby'}
-                                    </p>
-                                </div>
-                                <button 
-                                    onClick={handleRunDiagnostics}
-                                    disabled={diagState === 'running'}
-                                    class={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${diagState === 'running' ? 'bg-slate-900 border border-slate-800 text-slate-500' : 'bg-shieldBlue hover:bg-shieldBlue/90 text-slate-950 shadow-glowBlue'}`}
-                                >
-                                    {diagState === 'running' ? (
-                                        <>
-                                            <span class="w-3 h-3 border-2 border-slate-950 border-t-transparent rounded-full animate-spin"></span>
-                                            Testing Modules...
-                                        </>
-                                    ) : 'Run Self-Diagnostic'}
-                                </button>
-                            </div>
+                    {activeScreen === 'architecture' && (() => {
+                        const currentScenario = scenarios[selectedScenario];
+                        const stepIndex = simulatedStep;
+                        
+                        const getStepStatus = (index) => {
+                            if (index < stepIndex) return { icon: '✓', label: 'Completed', color: 'text-shieldGreen border-shieldGreen/30 bg-shieldGreen/10' };
+                            if (index === stepIndex) return { icon: '⟳', label: 'Processing', color: 'text-shieldOrange border-shieldOrange/30 bg-shieldOrange/10 animate-pulse' };
+                            return { icon: '…', label: 'Waiting', color: 'text-slate-600 border-slate-900 bg-slate-950' };
+                        };
 
-                            <p class="text-xs text-slate-400 leading-relaxed max-w-3xl">
-                                This control panel monitors the backend status of the AI Interceptor engine. Run a self-diagnostic to query the SQLite datastore read/write latencies, verify neural weights shapes, and calibrate localized Whisper/Twilio endpoints.
-                            </p>
+                        const step1 = getStepStatus(0);
+                        const step2 = getStepStatus(1);
+                        const step3 = getStepStatus(2);
+                        const step4 = getStepStatus(3);
+                        const step5 = getStepStatus(4);
+                        const step6 = getStepStatus(5);
+                        const step7 = getStepStatus(6);
 
-                            {/* Telemetry latency widgets */}
-                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3.5 mt-1">
-                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center">
-                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">DB Write Latency</span>
-                                    <span class="text-md font-black text-shieldBlue font-mono">{diagLatency.db ? `${diagLatency.db}ms` : '--'}</span>
-                                </div>
-                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center">
-                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">PyTorch Inference</span>
-                                    <span class="text-md font-black text-shieldBlue font-mono">{diagLatency.pytorch ? `${diagLatency.pytorch}ms` : '--'}</span>
-                                </div>
-                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center">
-                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">Random Forest</span>
-                                    <span class="text-md font-black text-shieldBlue font-mono">{diagLatency.randomforest ? `${diagLatency.randomforest}ms` : '--'}</span>
-                                </div>
-                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center">
-                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">Local STT (Whisper)</span>
-                                    <span class="text-md font-black text-shieldBlue font-mono">{diagLatency.stt ? `${diagLatency.stt}ms` : '--'}</span>
-                                </div>
-                                <div class="p-3 bg-slate-950 border border-slate-900 rounded-xl text-center col-span-2 md:col-span-1 flex flex-col justify-center">
-                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">Readiness Index</span>
-                                    <span class={`text-md font-black font-mono ${diagReadiness ? 'text-shieldGreen animate-pulse' : 'text-slate-600'}`}>{diagReadiness ? `${diagReadiness}%` : '--'}</span>
-                                </div>
-                            </div>
-
-                            {/* Diagnostics Log Console */}
-                            <div class="bg-slate-950 border border-slate-900 rounded-xl p-4 flex flex-col gap-2 font-mono text-[9px] leading-normal max-h-[160px] overflow-y-auto">
-                                <div class="text-[8px] text-slate-600 border-b border-slate-900 pb-1.5 uppercase font-bold tracking-widest flex justify-between items-center">
-                                    <span>Live Diagnostic Stream Output</span>
-                                    <span class={`flex items-center gap-1 ${diagState === 'running' ? 'text-shieldOrange' : diagState === 'done' ? 'text-shieldGreen' : 'text-slate-500'}`}>
-                                        <span class="w-1.5 h-1.5 bg-current rounded-full animate-ping"></span>
-                                        {diagState === 'running' ? 'CALIBRATING' : diagState === 'done' ? 'SYSTEM ONLINE' : 'STANDBY'}
-                                    </span>
-                                </div>
-                                <div class="flex flex-col gap-1 pr-1">
-                                    {diagLogs.length === 0 ? (
-                                        <span class="text-slate-600">No logs generated. Click "Run Self-Diagnostic" to launch full intercept check.</span>
-                                    ) : (
-                                        diagLogs.map((log, idx) => {
-                                            let colorClass = 'text-slate-400';
-                                            if (log.startsWith('[SUCCESS]')) colorClass = 'text-shieldGreen font-bold';
-                                            else if (log.startsWith('[WARN]')) colorClass = 'text-shieldOrange';
-                                            else if (log.startsWith('[INFO]')) colorClass = 'text-slate-400';
-                                            return <div key={idx} class={colorClass}>{log}</div>;
-                                        })
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Cards with Status indicators */}
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        return (
+                            <div class="glass-panel rounded-2xl p-6 flex flex-col gap-6">
                                 
-                                {/* Item 1 */}
-                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
-                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
-                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
-                                        ONLINE
+                                <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center border-b border-darkBorder pb-4 gap-4">
+                                    <div>
+                                        <h2 class="text-md font-extrabold text-white tracking-wider flex items-center gap-2">
+                                            <Icon name="activity" className="w-5 h-5 text-shieldBlue animate-pulse" />
+                                            AI MULTIMODAL INTERCEPT PIPELINE
+                                        </h2>
+                                        <p class="text-[10px] text-slate-500 font-semibold mt-0.5 font-mono">
+                                            Simulate real-time call interception, voice cloning checks, and NLP heuristic classifiers.
+                                        </p>
                                     </div>
-                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
-                                        Twilio Interception Bridge
+                                    
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500 mr-1">Select Scenario:</span>
+                                        <button 
+                                            onClick={() => startPipelineSimulation('otp')}
+                                            disabled={isSimulating}
+                                            class={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border ${selectedScenario === 'otp' ? 'bg-shieldRed/15 text-shieldRed border-shieldRed/30 shadow-glowRed' : 'bg-slate-950 border-slate-900 text-slate-400 hover:text-slate-200'}`}
+                                        >
+                                            <span class="w-1.5 h-1.5 bg-shieldRed rounded-full animate-ping"></span>
+                                            🚨 Bank OTP Scam
+                                        </button>
+                                        <button 
+                                            onClick={() => startPipelineSimulation('clone')}
+                                            disabled={isSimulating}
+                                            class={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border ${selectedScenario === 'clone' ? 'bg-shieldOrange/15 text-shieldOrange border-shieldOrange/30 shadow-glowOrange' : 'bg-slate-950 border-slate-900 text-slate-400 hover:text-slate-200'}`}
+                                        >
+                                            <span class="w-1.5 h-1.5 bg-shieldOrange rounded-full animate-ping"></span>
+                                            👥 Voice Clone Ransom
+                                        </button>
+                                        <button 
+                                            onClick={() => startPipelineSimulation('safe')}
+                                            disabled={isSimulating}
+                                            class={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5 border ${selectedScenario === 'safe' ? 'bg-shieldGreen/15 text-shieldGreen border-shieldGreen/30 shadow-glowGreen' : 'bg-slate-950 border-slate-900 text-slate-400 hover:text-slate-200'}`}
+                                        >
+                                            <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
+                                            🟢 Safe Call
+                                        </button>
                                     </div>
-                                    <p class="text-[10px] text-slate-500 leading-normal">
-                                        Configures carrier-assisted call forwarding using programmable Voice webhooks and media streaming forks (WebSockets) to feed the server.
-                                    </p>
                                 </div>
 
-                                {/* Item 2 */}
-                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
-                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
-                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
-                                        ONLINE
+                                <div class="bg-slate-950 border border-slate-900 rounded-xl p-4 flex flex-col gap-3">
+                                    <div class="flex items-center justify-between border-b border-slate-900 pb-2">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="w-2 h-2 rounded-full bg-shieldBlue animate-ping"></span>
+                                            <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-300">Scam Detection Pipeline Progress</span>
+                                        </div>
+                                        <span class="text-[9px] font-mono text-slate-500">Active Scenario: {scenarios[selectedScenario].name}</span>
                                     </div>
-                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
-                                        WebRTC VoIP Pipeline
+                                    <div class="grid grid-cols-2 md:grid-cols-7 gap-2 items-center">
+                                        {[
+                                            { label: 'Unknown Call', emoji: '📞', status: step1 },
+                                            { label: 'Transcript', emoji: '🎙️', status: step2 },
+                                            { label: 'Voice Analysis', emoji: '🔊', status: step3 },
+                                            { label: 'Scam Detection', emoji: '🧠', status: step4 },
+                                            { label: 'Reputation Check', emoji: '🛡️', status: step5 },
+                                            { label: 'AI Risk Score', emoji: '⚠️', status: step6 },
+                                            { label: 'User Alert', emoji: '🚨', status: step7 }
+                                        ].map((item, index) => (
+                                            <div key={index} class="flex items-center gap-1 w-full">
+                                                <div class={`flex-1 p-2 rounded-lg border flex items-center justify-between transition-all ${
+                                                    item.status.icon === '✓' 
+                                                        ? 'bg-shieldGreen/5 border-shieldGreen/30 text-shieldGreen shadow-glowGreen/10' 
+                                                        : item.status.icon === '⟳'
+                                                            ? 'bg-shieldOrange/10 border-shieldOrange/40 text-shieldOrange shadow-glowOrange/10 animate-pulse'
+                                                            : 'bg-slate-900/40 border-slate-900 text-slate-500 opacity-60'
+                                                }`}>
+                                                    <span class="text-xs">{item.emoji}</span>
+                                                    <span class="text-[9px] font-bold truncate mx-1">{item.label}</span>
+                                                    <span class="text-[10px] font-black font-mono">{item.status.icon}</span>
+                                                </div>
+                                                {index < 6 && (
+                                                    <span class="text-slate-800 hidden md:inline font-mono">→</span>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                    <p class="text-[10px] text-slate-500 leading-normal">
-                                        Streams in-app telephony audio directly using audio channel tracks (RTP payloads) to bypass sandbox constraints for VoIP clients.
-                                    </p>
                                 </div>
 
-                                {/* Item 3 */}
-                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
-                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldOrange bg-shieldOrange/10 px-1.5 py-0.5 rounded border border-shieldOrange/20">
-                                        <span class="w-1.5 h-1.5 bg-shieldOrange rounded-full animate-pulse"></span>
-                                        STANDBY
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-900/40 p-3.5 border border-darkBorder rounded-xl">
+                                    <div class="text-center md:border-r border-slate-800/60 pb-2 md:pb-0">
+                                        <span class="text-[8px] text-slate-500 uppercase block font-bold tracking-wider">Calls Analysed Today</span>
+                                        <span class="text-md font-black text-slate-200 font-mono">1,248</span>
                                     </div>
-                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
-                                        Android Mic Fallback
+                                    <div class="text-center md:border-r border-slate-800/60 pb-2 md:pb-0">
+                                        <span class="text-[8px] text-slate-500 uppercase block font-bold tracking-wider">Scam Calls Prevented</span>
+                                        <span class="text-md font-black text-shieldGreen font-mono">37</span>
                                     </div>
-                                    <p class="text-[10px] text-slate-500 leading-normal">
-                                        Provides accessibility monitoring and hardware speaker-loop record setups for OS configurations blocking direct cellular API hooks.
-                                    </p>
+                                    <div class="text-center md:border-r border-slate-800/60">
+                                        <span class="text-[8px] text-slate-500 uppercase block font-bold tracking-wider">Deepfake Attempts Blocked</span>
+                                        <span class="text-md font-black text-shieldOrange font-mono">6</span>
+                                    </div>
+                                    <div class="text-center">
+                                        <span class="text-[8px] text-slate-500 uppercase block font-bold tracking-wider">Average Response Time</span>
+                                        <span class="text-md font-black text-shieldBlue font-mono">2.3s</span>
+                                    </div>
                                 </div>
 
-                                {/* Item 4 */}
-                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
-                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
-                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
-                                        ONLINE
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    
+                                    <div class={`p-4 bg-slate-900/60 border rounded-xl flex flex-col gap-2 relative transition-all ${stepIndex >= 0 ? 'border-shieldBlue/40' : 'border-darkBorder opacity-50'}`}>
+                                        <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 1: Unknown Call Detected</div>
+                                        <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5 mt-0.5">
+                                            <Icon name="phone-call" className="w-4 h-4 text-shieldBlue animate-pulse" />
+                                            {currentScenario.caller.number}
+                                        </div>
+                                        <div class="flex justify-between items-center mt-1">
+                                            <span class="px-1.5 py-0.5 bg-slate-950 border border-slate-900 text-slate-400 rounded text-[8px] font-mono font-bold uppercase">{currentScenario.caller.badge}</span>
+                                            <span class="text-[8px] font-mono text-slate-500">{currentScenario.caller.timestamp}</span>
+                                        </div>
+                                        <div class="mt-2 pt-2 border-t border-slate-800/60 flex items-center gap-1.5">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-shieldGreen animate-ping"></span>
+                                            <span class="text-[9px] font-mono text-slate-400 font-bold uppercase">{currentScenario.caller.status}</span>
+                                        </div>
                                     </div>
-                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
-                                        FastAPI Engine & DB
+
+                                    <div class={`p-4 bg-slate-900/60 border rounded-xl flex flex-col gap-2 relative transition-all ${stepIndex >= 1 ? 'border-shieldBlue/40' : 'border-darkBorder opacity-50'}`}>
+                                        <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 2: Live Conversation Analysis</div>
+                                        <div class="bg-slate-950 border border-slate-900 rounded-lg p-2 min-h-[60px] flex items-center justify-center">
+                                            <p class="text-[10px] text-slate-300 italic font-medium leading-relaxed text-center">
+                                                {stepIndex >= 1 ? `"${currentScenario.transcript}"` : 'Waiting for audio stream...'}
+                                            </p>
+                                        </div>
+                                        <div class="flex justify-between items-center text-[8px] font-mono text-slate-500 mt-1">
+                                            <span>Lang: {stepIndex >= 1 ? currentScenario.language : '--'}</span>
+                                            <div class="flex gap-1">
+                                                {stepIndex >= 1 && currentScenario.keywords.map((kw, i) => (
+                                                    <span key={i} class="px-1 py-0.2 bg-shieldBlue/10 border border-shieldBlue/20 text-shieldBlue rounded-sm text-[7px] uppercase font-bold">{kw}</span>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p class="text-[10px] text-slate-500 leading-normal">
-                                        Runs asynchronous endpoints with SQLAlchemy, mapping call log entries to SQLite/PostgreSQL, synced with Redis queues for low-latency jobs.
-                                    </p>
+
+                                    <div class={`p-4 bg-slate-900/60 border rounded-xl flex flex-col gap-2 relative transition-all ${stepIndex >= 2 ? 'border-shieldBlue/40' : 'border-darkBorder opacity-50'}`}>
+                                        <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 3: Voice Authenticity Analysis</div>
+                                        <div class="flex flex-col gap-1.5 mt-2">
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-[9px] font-bold text-slate-400">Authenticity:</span>
+                                                <span class={`text-[9px] font-black uppercase ${currentScenario.voice.status === 'clone' ? 'text-shieldRed animate-pulse' : 'text-shieldGreen'}`}>
+                                                    {stepIndex >= 2 ? currentScenario.voice.label : '--'}
+                                                </span>
+                                            </div>
+                                            <div class="flex justify-between items-center">
+                                                <span class="text-[9px] font-bold text-slate-400">Confidence Match:</span>
+                                                <span class="text-[9px] font-mono font-extrabold text-slate-200">{stepIndex >= 2 ? currentScenario.voice.confidence : '--'}</span>
+                                            </div>
+                                            <div class="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-slate-900 mt-1">
+                                                <div 
+                                                    style={{ width: stepIndex >= 2 ? currentScenario.voice.confidence : '0%' }} 
+                                                    class={`h-full transition-all duration-500 ${currentScenario.voice.status === 'clone' ? 'bg-shieldRed' : 'bg-shieldGreen'}`}
+                                                ></div>
+                                            </div>
+                                            <div class="text-[7.5px] font-mono text-slate-500 mt-1 truncate">
+                                                {stepIndex >= 2 ? `Metrics: ${currentScenario.voice.indicator}` : 'Awaiting speech input...'}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class={`p-4 bg-slate-900/60 border rounded-xl flex flex-col gap-2 relative transition-all ${stepIndex >= 3 ? 'border-shieldBlue/40' : 'border-darkBorder opacity-50'}`}>
+                                        <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 4: Scam Pattern Detection</div>
+                                        <div class="flex flex-col gap-1.5 mt-1.5">
+                                            {currentScenario.patterns.map((pt, idx) => (
+                                                <div key={idx} class="flex justify-between items-center border-b border-slate-805/40 pb-1 text-[9px]">
+                                                    <span class="text-slate-400 font-semibold">{pt.name}</span>
+                                                    <span>
+                                                        {stepIndex >= 3 ? (
+                                                            pt.status === 'scam' ? (
+                                                                <span class="text-shieldRed font-black">🚨 ALERT</span>
+                                                            ) : pt.status === 'safe' ? (
+                                                                <span class="text-shieldGreen font-black">✓ OK</span>
+                                                            ) : pt.status === 'none' ? (
+                                                                <span class="text-slate-600 font-bold">✕ NONE</span>
+                                                            ) : (
+                                                                <span class="text-slate-600 font-bold">⚪ WAIT</span>
+                                                            )
+                                                        ) : '⚪'}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div class={`p-4 bg-slate-900/60 border rounded-xl flex flex-col gap-2 relative transition-all ${stepIndex >= 4 ? 'border-shieldBlue/40' : 'border-darkBorder opacity-50'}`}>
+                                        <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 5: Caller Reputation Analysis</div>
+                                        <div class="flex flex-col gap-2 mt-2 font-mono text-[9px]">
+                                            <div class="flex justify-between">
+                                                <span class="text-slate-500">Database History:</span>
+                                                <span class="text-slate-300 font-bold">{stepIndex >= 4 ? currentScenario.reputation.reports : '--'}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-slate-500">Spam Confidence:</span>
+                                                <span class="text-slate-300 font-bold">{stepIndex >= 4 ? currentScenario.reputation.confidence : '--'}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-slate-500">Frequency Rate:</span>
+                                                <span class="text-slate-300 font-bold">{stepIndex >= 4 ? currentScenario.reputation.frequency : '--'}</span>
+                                            </div>
+                                            <div class="flex justify-between">
+                                                <span class="text-slate-500">Sim Registration Age:</span>
+                                                <span class="text-slate-300 font-bold">{stepIndex >= 4 ? currentScenario.reputation.age : '--'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class={`p-4 bg-slate-900/60 border rounded-xl flex flex-col gap-2 relative transition-all ${stepIndex >= 5 ? 'border-shieldBlue/40' : 'border-darkBorder opacity-50'}`}>
+                                        <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 6: AI Risk Scoring Engine</div>
+                                        <div class="grid grid-cols-2 gap-2 mt-1.5">
+                                            <div class="bg-slate-950 border border-slate-900 rounded-lg p-2 flex flex-col justify-center text-center">
+                                                <span class="text-[7px] text-slate-500 uppercase font-black block">Fusion Calculation</span>
+                                                <div class="text-[8px] font-mono text-slate-400 mt-1 leading-normal">
+                                                    Voice: {stepIndex >= 5 ? currentScenario.fusion.voice : '0.0'}<br/>
+                                                    Intent: {stepIndex >= 5 ? currentScenario.fusion.intent : '0.0'}<br/>
+                                                    Meta: {stepIndex >= 5 ? currentScenario.fusion.metadata : '0.0'}
+                                                </div>
+                                            </div>
+                                            <div class="bg-slate-950 border border-slate-900 rounded-lg p-2 flex flex-col justify-center items-center">
+                                                <span class="text-[7px] text-slate-500 uppercase font-black block">Final Score</span>
+                                                <span class={`text-xl font-black font-mono ${stepIndex >= 5 ? (currentScenario.fusion.finalScore > 50 ? 'text-shieldRed animate-pulse' : 'text-shieldGreen') : 'text-slate-600'}`}>
+                                                    {stepIndex >= 5 ? `${currentScenario.fusion.finalScore}%` : '--'}
+                                                </span>
+                                                <span class="text-[7.5px] font-mono font-bold text-slate-500">{stepIndex >= 5 ? `THREAT: ${currentScenario.fusion.level}` : '--'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* Item 5 */}
-                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
-                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
-                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
-                                        ONLINE
-                                    </div>
-                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
-                                        Speech Decoders (STT)
-                                    </div>
-                                    <p class="text-[10px] text-slate-500 leading-normal">
-                                        Integrates local Whisper decoders alongside Deepgram API endpoints to transcribe mixed Hindlish languages in real-time.
-                                    </p>
-                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    
+                                    <div class={`p-4 bg-slate-900/60 border rounded-xl flex flex-col gap-2 relative md:col-span-2 transition-all ${stepIndex >= 6 ? 'border-shieldBlue/40' : 'border-darkBorder opacity-50'}`}>
+                                        <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 7: Explainable AI Insights</div>
+                                        
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                                            <div class="flex flex-col gap-1.5">
+                                                <span class="text-[9px] font-bold text-slate-400 uppercase font-mono tracking-wide font-black">Why was this call flagged?</span>
+                                                <div class="flex flex-col gap-1.5 mt-1">
+                                                    {stepIndex >= 6 ? (
+                                                        currentScenario.explain.map((exp, i) => (
+                                                            <div key={i} class="flex items-start gap-1.5 text-[9px] text-slate-300 leading-normal">
+                                                                <span class="text-shieldRed mt-0.5">✓</span>
+                                                                <span>{exp}</span>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <span class="text-[9px] text-slate-600 italic">Waiting for decision triggers...</span>
+                                                    )}
+                                                </div>
+                                            </div>
 
-                                {/* Item 6 */}
-                                <div class="p-4 bg-slate-900/60 border border-darkBorder rounded-xl flex flex-col gap-2 relative group overflow-hidden">
-                                    <div class="absolute top-2 right-2 flex items-center gap-1 text-[8px] font-mono font-bold text-shieldGreen bg-shieldGreen/10 px-1.5 py-0.5 rounded border border-shieldGreen/20">
-                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full"></span>
-                                        ONLINE
+                                            <div class="flex flex-col gap-1 border-l border-slate-800/80 pl-4">
+                                                <span class="text-[9px] font-bold text-slate-400 uppercase font-mono tracking-wide font-black">Analysis Detection Timeline:</span>
+                                                <div class="flex flex-col gap-1 max-h-[110px] overflow-y-auto pr-1 mt-1">
+                                                    {stepIndex >= 6 ? (
+                                                        currentScenario.timeline.map((tl, i) => (
+                                                            <div key={i} class="flex items-start gap-1.5 text-[8.5px] font-mono leading-normal py-0.5 border-b border-slate-850/40">
+                                                                <span class="text-shieldBlue font-bold">{tl.time}</span>
+                                                                <span class="text-slate-400">{tl.event}</span>
+                                                            </div>
+                                                        ))
+                                                    ) : (
+                                                        <span class="text-[9px] text-slate-600 italic">Waiting for call telemetry...</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 bg-shieldBlue rounded-full"></span>
-                                        Scam Intent Classifier
+
+                                    <div class={`p-4 bg-slate-900/60 border rounded-xl flex flex-col gap-2 relative transition-all justify-between ${stepIndex >= 7 ? 'border-shieldBlue/40' : 'border-darkBorder opacity-50'}`}>
+                                        <div>
+                                            <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 8: Threat Response Center</div>
+                                            
+                                            <div class="mt-2.5">
+                                                {stepIndex >= 7 ? (
+                                                    currentScenario.fusion.finalScore > 95 ? (
+                                                        <div class="p-3 bg-shieldRed/15 border border-shieldRed/30 rounded-lg text-center flex flex-col gap-1.5 animate-pulse shadow-glowRed">
+                                                            <span class="text-shieldRed text-xs font-black uppercase tracking-widest">🔴 CRITICAL THREAT ALERT</span>
+                                                            <span class="text-[8.5px] text-slate-300 font-medium">Synthesized AI Deepfake target frame identified. Interceptor armed.</span>
+                                                        </div>
+                                                    ) : currentScenario.fusion.finalScore > 50 ? (
+                                                        <div class="p-3 bg-shieldRed/15 border border-shieldRed/30 rounded-lg text-center flex flex-col gap-1.5 animate-pulse shadow-glowRed">
+                                                            <span class="text-shieldRed text-xs font-black uppercase tracking-widest">🔴 HIGH PROBABILITY SCAM</span>
+                                                            <span class="text-[8.5px] text-slate-300 font-medium">OTP request and block threads detected. Hang up immediately.</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div class="p-3 bg-shieldGreen/15 border border-shieldGreen/30 rounded-lg text-center flex flex-col gap-1.5 shadow-glowGreen">
+                                                            <span class="text-shieldGreen text-xs font-black uppercase tracking-widest">🟢 SAFE CALL</span>
+                                                            <span class="text-[8.5px] text-slate-300 font-medium">Legitimate conversation pattern. No scam signs flagged.</span>
+                                                        </div>
+                                                    )
+                                                ) : (
+                                                    <div class="p-3 bg-slate-950 border border-slate-900 rounded-lg text-center text-[9px] text-slate-600 italic">
+                                                        Awaiting final scoring...
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div class="flex flex-col gap-2 mt-3">
+                                            <button 
+                                                onClick={() => { playChime(330, 0.4); alert("Interception bridge terminated caller connection."); }}
+                                                class="w-full bg-shieldRed hover:bg-shieldRed/95 text-slate-950 font-black py-1.5 rounded-lg text-[10px] uppercase transition-all tracking-wider flex items-center justify-center gap-1.5"
+                                            >
+                                                🟥 End Call
+                                            </button>
+                                            <div class="grid grid-cols-2 gap-2">
+                                                <button 
+                                                    onClick={() => { playChime(660, 0.15); alert("Warning acknowledged. Background monitor persists."); }}
+                                                    class="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-400 font-bold py-1 rounded-lg text-[9px] uppercase transition-all"
+                                                >
+                                                    🟨 Proceed Carefully
+                                                </button>
+                                                <button 
+                                                    onClick={() => { playChime(880, 0.2); alert("Contact signature whitelisted as Safe."); }}
+                                                    class="w-full bg-shieldGreen hover:bg-shieldGreen/90 text-slate-950 font-bold py-1 rounded-lg text-[9px] uppercase transition-all"
+                                                >
+                                                    🟩 Mark as Safe
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <p class="text-[10px] text-slate-500 leading-normal">
-                                        Utilizes an ensemble TF-IDF and NLP keyword pattern classifier to extract threat signals (OTP demands, money transfer, scare).
-                                    </p>
+                                    
                                 </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* SCREEN: SETTINGS */}
                     {activeScreen === 'settings' && (

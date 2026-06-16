@@ -121,6 +121,13 @@ def mic_demo():
         return FileResponse(MIC_DEMO_FILE, media_type="text/html")
     return {"error": "mic_demo.html not found"}
 
+@app.get("/static/sample_audio.wav")
+def get_sample_audio():
+    sample_path = os.path.join(os.path.dirname(__file__), "sample_audio.wav")
+    if os.path.exists(sample_path):
+        return FileResponse(sample_path, media_type="audio/wav")
+    return {"error": "sample_audio.wav not found"}
+
 @app.get("/static/beep.wav")
 def get_beep_wav():
     import math
@@ -154,6 +161,18 @@ def get_beep_wav():
 @app.on_event("startup")
 def startup():
     init_db()
+    # Migration: ensure Sonal's profile has the default audio path
+    db = SessionLocal()
+    try:
+        sonal_prof = db.query(VoiceProfile).filter_by(name="Sonal Tripathi").first()
+        if sonal_prof and not sonal_prof.audio_data:
+            sonal_prof.audio_data = "/static/sample_audio.wav"
+            db.commit()
+    except Exception as e:
+        print(f"[WARN] Failed to apply Sonal profile migration: {e}")
+    finally:
+        db.close()
+        
     print("[Server] ✅ Database initialized")
     print(f"[Server] Model loaded: {MODEL_LOADED}")
     print("[Server] 🌐 Demo: http://localhost:8000/")
@@ -526,6 +545,11 @@ def _demo_score(text: str):
     return round(score, 4), label
 
 
+from fastapi import Header
+
+def get_user_id(x_user_id: Optional[str] = Header(None)) -> str:
+    return x_user_id or "default_user"
+
 # ─────────────────────────────────────────────
 # REST API: Calls
 # ─────────────────────────────────────────────
@@ -533,11 +557,13 @@ def _demo_score(text: str):
 def list_calls(
     limit: int = 50,
     skip: int = 0,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user_id: str = Depends(get_user_id)
 ):
     try:
         calls = (
             db.query(CallSession)
+            .filter_by(user_id=user_id)
             .order_by(CallSession.started_at.desc())
             .offset(skip)
             .limit(limit)
@@ -551,9 +577,9 @@ def list_calls(
 
 
 @app.get("/api/calls/{call_sid}")
-def get_call(call_sid: str, db: Session = Depends(get_db)):
+def get_call(call_sid: str, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     try:
-        call = db.query(CallSession).filter_by(call_sid=call_sid).first()
+        call = db.query(CallSession).filter_by(call_sid=call_sid, user_id=user_id).first()
         if not call:
             raise HTTPException(status_code=404, detail="Call not found")
         events = (
@@ -623,11 +649,14 @@ class SettingsUpdate(BaseModel):
 
 
 @app.get("/api/settings")
-def get_settings(db: Session = Depends(get_db)):
+def get_settings(db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     try:
-        s = db.query(AppSettings).first()
+        s = db.query(AppSettings).filter_by(user_id=user_id).first()
         if not s:
-            s = AppSettings()
+            s = AppSettings(user_id=user_id)
+            db.add(s)
+            db.commit()
+            db.refresh(s)
         return {
             "risk_threshold":   s.risk_threshold,
             "auto_hangup":      s.auto_hangup,
@@ -646,11 +675,11 @@ def get_settings(db: Session = Depends(get_db)):
 
 
 @app.post("/api/settings")
-def update_settings(body: SettingsUpdate, db: Session = Depends(get_db)):
+def update_settings(body: SettingsUpdate, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     try:
-        s = db.query(AppSettings).first()
+        s = db.query(AppSettings).filter_by(user_id=user_id).first()
         if not s:
-            s = AppSettings()
+            s = AppSettings(user_id=user_id)
             db.add(s)
         if body.risk_threshold   is not None: s.risk_threshold   = body.risk_threshold
         if body.auto_hangup      is not None: s.auto_hangup      = body.auto_hangup
@@ -776,7 +805,7 @@ class ContactsSync(BaseModel):
 
 
 @app.post("/api/contacts/sync")
-def sync_contacts(body: ContactsSync, db: Session = Depends(get_db)):
+def sync_contacts(body: ContactsSync, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """
     Mobile app calls this to upload SHA-256 hashes of saved contacts.
     Backend uses this to skip AI analysis for known numbers.
@@ -788,23 +817,23 @@ def sync_contacts(body: ContactsSync, db: Session = Depends(get_db)):
         if len(h_clean) != 64 or not all(c in "0123456789abcdef" for c in h_clean):
             skipped += 1
             continue
-        exists = db.query(SavedContact).filter_by(phone_hash=h_clean).first()
+        exists = db.query(SavedContact).filter_by(phone_hash=h_clean, user_id=user_id).first()
         if not exists:
-            db.add(SavedContact(phone_hash=h_clean))
+            db.add(SavedContact(phone_hash=h_clean, user_id=user_id))
             added += 1
     db.commit()
-    total = db.query(SavedContact).count()
+    total = db.query(SavedContact).filter_by(user_id=user_id).count()
     return {"added": added, "skipped": skipped, "total_contacts": total}
 
 
 @app.get("/api/contacts/count")
-def contacts_count(db: Session = Depends(get_db)):
-    return {"count": db.query(SavedContact).count()}
+def contacts_count(db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+    return {"count": db.query(SavedContact).filter_by(user_id=user_id).count()}
 
 
 @app.delete("/api/contacts/clear")
-def clear_contacts(db: Session = Depends(get_db)):
-    db.query(SavedContact).delete()
+def clear_contacts(db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
+    db.query(SavedContact).filter_by(user_id=user_id).delete()
     db.commit()
     return {"status": "cleared"}
 
@@ -820,37 +849,33 @@ class VoiceProfileCreate(BaseModel):
     status: Optional[str] = "Voice Authenticated"
     features: Optional[str] = None
     date: Optional[str] = None
+    audio_data: Optional[str] = None
 
 
 @app.get("/api/voice-profiles")
-def get_voice_profiles(db: Session = Depends(get_db)):
+def get_voice_profiles(db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """Fetch all enrolled voice vault profiles."""
-    profiles = db.query(VoiceProfile).all()
-    # If empty, seed default profiles so there's always baseline mock data
-    if not profiles:
-        return [
-            { "id": 1, "name": "Sonal Tripathi", "role": "Son", "phone": "+91 70192 38491", "hash": "98a3b50c18d9f4e2...", "status": "Voice Authenticated", "date": "June 12, 2026", "features": "Pitch: 142.4Hz, HNR: 11.4dB" },
-            { "id": 2, "name": "Family Backup Desk", "role": "Backup", "phone": "+91 80012 34567", "hash": "41b2c3d4e5f6a7b8...", "status": "Vault Enrolled", "date": "June 13, 2026", "features": "Pitch: 210.8Hz, HNR: 14.8dB" }
-        ]
-    return profiles
+    return db.query(VoiceProfile).filter_by(user_id=user_id).all()
 
 
 @app.post("/api/voice-profiles")
-def create_voice_profile(body: VoiceProfileCreate, db: Session = Depends(get_db)):
+def create_voice_profile(body: VoiceProfileCreate, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """Enroll a new voice profile."""
-    # Prevent adding duplicate phones
-    existing = db.query(VoiceProfile).filter_by(phone=body.phone).first()
+    # Prevent adding duplicate phones for this user
+    existing = db.query(VoiceProfile).filter_by(phone=body.phone, user_id=user_id).first()
     if existing:
         raise HTTPException(status_code=400, detail="A profile with this phone number is already enrolled.")
         
     db_profile = VoiceProfile(
+        user_id=user_id,
         name=body.name,
         role=body.role,
         phone=body.phone,
         hash=body.hash,
         status=body.status,
         features=body.features,
-        date=body.date
+        date=body.date,
+        audio_data=body.audio_data
     )
     db.add(db_profile)
     db.commit()
@@ -859,9 +884,9 @@ def create_voice_profile(body: VoiceProfileCreate, db: Session = Depends(get_db)
 
 
 @app.delete("/api/voice-profiles/{profile_id}")
-def delete_voice_profile(profile_id: int, db: Session = Depends(get_db)):
+def delete_voice_profile(profile_id: int, db: Session = Depends(get_db), user_id: str = Depends(get_user_id)):
     """Remove a voice profile from the database."""
-    profile = db.query(VoiceProfile).filter_by(id=profile_id).first()
+    profile = db.query(VoiceProfile).filter_by(id=profile_id, user_id=user_id).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     db.delete(profile)

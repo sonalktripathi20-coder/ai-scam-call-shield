@@ -59,6 +59,7 @@ class CallSession(Base):
     __tablename__ = "call_sessions"
 
     id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(String(64), default="default_user", index=True)
     call_sid    = Column(String(64), unique=True, index=True, nullable=False)
     from_number = Column(String(20))
     to_number   = Column(String(20))
@@ -110,10 +111,11 @@ class ScoreEvent(Base):
 
 
 class AppSettings(Base):
-    """Global app configuration (one row, id=1)."""
+    """Global app configuration per user."""
     __tablename__ = "app_settings"
 
-    id               = Column(Integer, primary_key=True, default=1)
+    id               = Column(Integer, primary_key=True)
+    user_id          = Column(String(64), default="default_user", unique=True, index=True)
     risk_threshold   = Column(Float, default=0.71)
     auto_hangup      = Column(Boolean, default=True)
     alert_suspicious = Column(Boolean, default=True)
@@ -128,7 +130,8 @@ class SavedContact(Base):
     __tablename__ = "saved_contacts"
 
     id          = Column(Integer, primary_key=True, index=True)
-    phone_hash  = Column(String(64), unique=True, index=True, nullable=False)
+    user_id     = Column(String(64), default="default_user", index=True)
+    phone_hash  = Column(String(64), index=True, nullable=False)
     synced_at   = Column(DateTime, default=datetime.utcnow)
 
 
@@ -137,6 +140,7 @@ class VoiceProfile(Base):
     __tablename__ = "voice_profiles"
 
     id       = Column(Integer, primary_key=True, index=True)
+    user_id  = Column(String(64), default="default_user", index=True)
     name     = Column(String(100), nullable=False)
     role     = Column(String(50), nullable=False)
     phone    = Column(String(50), nullable=False)
@@ -144,6 +148,7 @@ class VoiceProfile(Base):
     status   = Column(String(50), default="Voice Authenticated")
     features = Column(String(200), nullable=True)
     date     = Column(String(100), nullable=True)
+    audio_data = Column(Text, nullable=True)
 
 
 class ReputationReport(Base):
@@ -170,8 +175,32 @@ def init_db():
             db.query(CallSession).first()
             db.query(VoiceProfile).first()
             
-            if not db.query(AppSettings).first():
-                db.add(AppSettings())
+            if not db.query(AppSettings).filter_by(user_id="default_user").first():
+                db.add(AppSettings(user_id="default_user"))
+                db.commit()
+                
+            if not db.query(VoiceProfile).filter_by(user_id="default_user").first():
+                db.add(VoiceProfile(
+                    user_id="default_user",
+                    name="Sonal Tripathi",
+                    role="Son",
+                    phone="+91 70192 38491",
+                    hash="98a3b50c18d9f4e2...",
+                    status="Voice Authenticated",
+                    date="June 12, 2026",
+                    features="Pitch: 142.4Hz, HNR: 11.4dB",
+                    audio_data="/static/sample_audio.wav"
+                ))
+                db.add(VoiceProfile(
+                    user_id="default_user",
+                    name="Family Backup Desk",
+                    role="Backup",
+                    phone="+91 80012 34567",
+                    hash="41b2c3d4e5f6a7b8...",
+                    status="Vault Enrolled",
+                    date="June 13, 2026",
+                    features="Pitch: 210.8Hz, HNR: 14.8dB"
+                ))
                 db.commit()
         finally:
             db.close()
@@ -184,7 +213,28 @@ def init_db():
         Base.metadata.create_all(bind=engine)
         db = SessionLocal()
         try:
-            db.add(AppSettings())
+            db.add(AppSettings(user_id="default_user"))
+            db.add(VoiceProfile(
+                user_id="default_user",
+                name="Sonal Tripathi",
+                role="Son",
+                phone="+91 70192 38491",
+                hash="98a3b50c18d9f4e2...",
+                status="Voice Authenticated",
+                date="June 12, 2026",
+                features="Pitch: 142.4Hz, HNR: 11.4dB",
+                audio_data="/static/sample_audio.wav"
+            ))
+            db.add(VoiceProfile(
+                user_id="default_user",
+                name="Family Backup Desk",
+                role="Backup",
+                phone="+91 80012 34567",
+                hash="41b2c3d4e5f6a7b8...",
+                status="Vault Enrolled",
+                date="June 13, 2026",
+                features="Pitch: 210.8Hz, HNR: 14.8dB"
+            ))
             db.commit()
         finally:
             db.close()
@@ -230,7 +280,9 @@ def get_db() -> Session:
 
 def create_call(db: Session, call_sid: str, from_num: str, to_num: str,
                 settings: AppSettings) -> CallSession:
+    user_id = getattr(settings, "user_id", "default_user")
     call = CallSession(
+        user_id        = user_id,
         call_sid       = call_sid,
         from_number    = from_num,
         to_number      = to_num,
