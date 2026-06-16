@@ -794,7 +794,7 @@ def get_stats(db: Session = Depends(get_db)):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model_loaded": MODEL_LOADED, "time": datetime.utcnow().isoformat()}
+    return {"status": "ok", "version": "1.1.0", "model_loaded": MODEL_LOADED, "time": datetime.utcnow().isoformat()}
 
 
 # ─────────────────────────────────────────────
