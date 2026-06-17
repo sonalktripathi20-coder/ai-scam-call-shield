@@ -29,6 +29,9 @@ echo *.pyc
 echo *.db
 echo *.log
 echo *.apk
+echo .gradle/
+echo **/build/
+echo android-app-project/.gradle/
 ) > .gitignore
 
 echo.
@@ -37,6 +40,8 @@ git rm -r --cached backend/venv >nul 2>&1
 git rm -r --cached spring-boot-backend/target >nul 2>&1
 git rm -r --cached mobile-app/node_modules >nul 2>&1
 git rm -r --cached android-app/node_modules >nul 2>&1
+git rm -r --cached android-app-project/.gradle >nul 2>&1
+git rm -r --cached android-app/.gradle >nul 2>&1
 git rm -r --cached .idea >nul 2>&1
 git rm -r --cached __pycache__ >nul 2>&1
 git rm -r --cached backend/__pycache__ >nul 2>&1

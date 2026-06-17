@@ -8,3 +8,6 @@ __pycache__/
 *.db
 *.log
 *.apk
+.gradle/
+**/build/
+android-app-project/.gradle/

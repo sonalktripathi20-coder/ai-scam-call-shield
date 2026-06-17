@@ -86,7 +86,7 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <!-- Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.23.3/babel.min.js"></script>
     <script>
         Babel.registerPreset("custom-react", {
             presets: [
@@ -321,7 +321,9 @@
                     }
                 } catch(e) {}
                 return defaultList;
-                      const fetchAvailableProfiles = async () => {
+            });
+
+            const fetchAvailableProfiles = async () => {
                 try {
                     const res = await fetch('/api/user-profiles');
                     let backendData = [];
@@ -478,19 +480,79 @@
             // Trusted Profiles State
             const [trustedProfiles, setTrustedProfiles] = useState([]);
 
-            useEffect(() => {
-                fetch('/api/voice-profiles', {
-                    headers: {
-                        'x-user-id': userId
-                    }
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (Array.isArray(data)) {
-                            setTrustedProfiles(data);
+            const fetchVoiceProfiles = async () => {
+                try {
+                    const res = await fetch('/api/voice-profiles', {
+                        headers: {
+                            'x-user-id': userId
                         }
-                    })
-                    .catch(err => console.error("Error loading voice profiles:", err));
+                    });
+                    let backendData = [];
+                    if (res.ok) {
+                        backendData = await res.json();
+                    }
+                    
+                    // Load local voice profiles from localStorage
+                    let localData = [];
+                    try {
+                        const saved = localStorage.getItem('scamShieldVoiceProfiles');
+                        if (saved) {
+                            localData = JSON.parse(saved);
+                        }
+                    } catch(e) {}
+                    
+                    // Merge local voice profiles and backend voice profiles
+                    const combined = [...backendData, ...localData];
+                    const uniqueMap = new Map();
+                    combined.forEach(p => {
+                        // Only show profiles belonging to the current user (or default user)
+                        if (p && p.phone && (p.user_id === userId || p.user_id === 'default_user' || !p.user_id)) {
+                            uniqueMap.set(p.phone, p);
+                        }
+                    });
+                    
+                    // Ensure the two default system voice profiles are always present
+                    const defaults = [
+                        {
+                            id: 1,
+                            user_id: 'default_user',
+                            name: "Sonal Tripathi",
+                            role: "Son",
+                            phone: "+91 70192 38491",
+                            hash: "98a3b50c18d9f4e2...",
+                            status: "Voice Authenticated",
+                            date: "June 12, 2026",
+                            features: "Pitch: 142.4Hz, HNR: 11.4dB",
+                            audio_data: "/static/sample_audio.wav"
+                        },
+                        {
+                            id: 2,
+                            user_id: 'default_user',
+                            name: "Family Backup Desk",
+                            role: "Backup",
+                            phone: "+91 80012 34567",
+                            hash: "41b2c3d4e5f6a7b8...",
+                            status: "Vault Enrolled",
+                            date: "June 13, 2026",
+                            features: "Pitch: 210.8Hz, HNR: 14.8dB"
+                        }
+                    ];
+                    defaults.forEach(d => {
+                        if (!uniqueMap.has(d.phone)) {
+                            uniqueMap.set(d.phone, d);
+                        }
+                    });
+                    
+                    const uniqueProfiles = Array.from(uniqueMap.values());
+                    setTrustedProfiles(uniqueProfiles);
+                    localStorage.setItem('scamShieldVoiceProfiles', JSON.stringify(uniqueProfiles));
+                } catch(err) {
+                    console.error("Error loading voice profiles:", err);
+                }
+            };
+
+            useEffect(() => {
+                fetchVoiceProfiles();
             }, [userId]);
             const [newProfileName, setNewProfileName] = useState('');
             const [newProfilePhone, setNewProfilePhone] = useState('');
@@ -859,6 +921,23 @@
                         audio_data: currentVoiceBase64
                     };
 
+                    const tempId = Date.now();
+                    const newProfileLocal = {
+                        ...newProfile,
+                        id: tempId,
+                        user_id: userId
+                    };
+                    
+                    // Save to local state and local storage immediately for offline resilience
+                    let savedLocal = [];
+                    try {
+                        const saved = localStorage.getItem('scamShieldVoiceProfiles');
+                        if (saved) savedLocal = JSON.parse(saved);
+                    } catch(e) {}
+                    savedLocal.push(newProfileLocal);
+                    localStorage.setItem('scamShieldVoiceProfiles', JSON.stringify(savedLocal));
+                    setTrustedProfiles(savedLocal);
+
                     fetch('/api/voice-profiles', {
                         method: 'POST',
                         headers: { 
@@ -872,7 +951,16 @@
                         return res.json();
                     })
                     .then(dbProfile => {
-                        setTrustedProfiles(prev => [...prev, dbProfile]);
+                        // Replace temp local profile with database profile to get actual id
+                        let savedLocalCurrent = [];
+                        try {
+                            const saved = localStorage.getItem('scamShieldVoiceProfiles');
+                            if (saved) savedLocalCurrent = JSON.parse(saved);
+                        } catch(e) {}
+                        const updatedLocal = savedLocalCurrent.map(p => p.phone === dbProfile.phone ? dbProfile : p);
+                        localStorage.setItem('scamShieldVoiceProfiles', JSON.stringify(updatedLocal));
+                        
+                        setTrustedProfiles(updatedLocal);
                         setEnrollState('success');
                         setCurrentVoiceBase64(null);
                         
@@ -2211,6 +2299,17 @@
                                                      <button 
                                                          onClick={() => {
                                                              if(profile.id <= 2) return alert("System protected profiles cannot be deleted.");
+                                                             
+                                                             // Instantly remove from local state and localStorage
+                                                             setTrustedProfiles(prev => prev.filter(p => p.phone !== profile.phone));
+                                                             let savedLocal = [];
+                                                             try {
+                                                                 const saved = localStorage.getItem('scamShieldVoiceProfiles');
+                                                                 if (saved) savedLocal = JSON.parse(saved);
+                                                             } catch(e) {}
+                                                             const updatedLocal = savedLocal.filter(p => p.phone !== profile.phone);
+                                                             localStorage.setItem('scamShieldVoiceProfiles', JSON.stringify(updatedLocal));
+
                                                              fetch(`/api/voice-profiles/${profile.id}`, { 
                                                                  method: 'DELETE',
                                                                  headers: {
@@ -2219,7 +2318,6 @@
                                                              })
                                                                  .then(res => {
                                                                      if(res.ok) {
-                                                                         setTrustedProfiles(prev => prev.filter(p => p.id !== profile.id));
                                                                          playChime(440, 0.1);
                                                                      }
                                                                  })
