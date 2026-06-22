@@ -1332,6 +1332,12 @@
                 return () => clearInterval(interval);
             }, [speakerActive]);
  
+            // Decouple canvas rendering from React state changes to prevent hook thrashing
+            const speakerScoreRef = useRef(speakerScore);
+            useEffect(() => {
+                speakerScoreRef.current = speakerScore;
+            }, [speakerScore]);
+
             useEffect(() => {
                 const canvas = speakerCanvasRef.current;
                 if (!canvas) return;
@@ -1348,10 +1354,13 @@
                     const height = canvas.height;
                     const midY = height / 2;
  
-                    const isHighRisk = speakerScore > 70;
+                    const currentScore = speakerScoreRef.current;
+                    const isHighRisk = currentScore > 70;
                     ctx.strokeStyle = isHighRisk ? 'rgba(239, 68, 68, 0.85)' : 'rgba(56, 189, 248, 0.85)';
-                    ctx.shadowColor = isHighRisk ? '#ef4444' : '#38bdf8';
-                    ctx.shadowBlur = 10;
+                    
+                    // Disable canvas shadows - they are extremely CPU/GPU intensive on mobile browsers
+                    ctx.shadowColor = 'transparent';
+                    ctx.shadowBlur = 0;
                     ctx.lineWidth = 2;
  
                     ctx.beginPath();
@@ -1367,9 +1376,9 @@
                             const y = v * midY;
                             
                             if (i === 0) {
-                                    ctx.moveTo(x, y);
+                                ctx.moveTo(x, y);
                             } else {
-                                    ctx.lineTo(x, y);
+                                ctx.lineTo(x, y);
                             }
                         }
                     } else if (speakerActive) {
@@ -1393,7 +1402,6 @@
                     if (speakerActive) {
                         ctx.lineWidth = 1;
                         ctx.strokeStyle = isHighRisk ? 'rgba(239, 68, 68, 0.25)' : 'rgba(56, 189, 248, 0.25)';
-                        ctx.shadowBlur = 0;
                         ctx.beginPath();
                         phase += 0.02;
                         const amp2 = isHighRisk ? 15 : 6;
@@ -1408,15 +1416,20 @@
                         ctx.stroke();
                     }
  
-                    animationFrameId = requestAnimationFrame(drawWave);
+                    // ONLY request the next frame if speaker active to prevent background CPU drain when idle!
+                    if (speakerActive) {
+                        animationFrameId = requestAnimationFrame(drawWave);
+                    }
                 };
  
                 drawWave();
  
                 return () => {
-                    cancelAnimationFrame(animationFrameId);
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                    }
                 };
-            }, [speakerActive, speakerScore]);
+            }, [speakerActive]);
  
             const startSimulatedSpeakerCall = (scenarioKey) => {
                 setSpeakerActive(true);
