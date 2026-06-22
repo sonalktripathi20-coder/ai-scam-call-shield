@@ -514,6 +514,7 @@
             const speakerCanvasRef = useRef(null);
             const speakerStreamRef = useRef(null);
             const speakerActiveRef = useRef(false);
+            const speakerLanguageRef = useRef('en-IN');
 
             // Log database
             const [reports, setReports] = useState([
@@ -1196,17 +1197,9 @@
                     setSpeakerActive(true);
                     playChime(659, 0.15);
 
-                    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
-                    if (!SpeechRecognitionClass) {
-                        setSpeechSupportError('Speech Recognition is not supported on this browser. Please use "Simulate Scenario Dialogue" buttons.');
-                        return;
-                    }
-
                     if (isMobileDevice) {
-                        // Mobile: Skip raw getUserMedia/AudioContext to prevent device microphone stream conflicts
                         setSpeakerTelemetrySteps(prev => [...prev, "Microphone Active (Mobile Optimized)", "AI Shield Enabled"]);
                     } else {
-                        // Desktop: Connect Web Audio analyser for real-time waveform
                         try {
                             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                             speakerStreamRef.current = stream;
@@ -1214,12 +1207,9 @@
 
                             const AudioContextClass = window.AudioContext || window.webkitAudioContext;
                             const audioCtx = new AudioContextClass();
-                            
-                            // Force resume on mobile browsers
                             if (audioCtx.state === 'suspended') {
                                 await audioCtx.resume();
                             }
-                            
                             const source = audioCtx.createMediaStreamSource(stream);
                             const analyser = audioCtx.createAnalyser();
                             analyser.fftSize = 256;
@@ -1233,53 +1223,67 @@
                         }
                     }
 
-                    const recognition = new SpeechRecognitionClass();
-                    recognition.continuous = !isMobileDevice; // False on mobile to force auto-restart on pauses
-                    recognition.interimResults = true;
-                    recognition.lang = speakerLanguage;
+                    // Define helper to run Speech Recognition by creating a fresh instance
+                    const runRecognition = () => {
+                        if (!speakerActiveRef.current) return;
 
-                    recognition.onresult = (event) => {
-                        let finalTranscript = '';
-                        for (let i = event.resultIndex; i < event.results.length; ++i) {
-                            if (event.results[i].isFinal) {
-                                finalTranscript += event.results[i][0].transcript + ' ';
+                        const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        if (!SpeechRecognitionClass) {
+                            setSpeechSupportError('Speech Recognition is not supported on this browser.');
+                            return;
+                        }
+
+                        const recognition = new SpeechRecognitionClass();
+                        recognition.continuous = !isMobileDevice; // False on mobile to force auto-restart on pauses
+                        recognition.interimResults = true;
+                        recognition.lang = speakerLanguageRef.current;
+
+                        recognition.onresult = (event) => {
+                            let finalTranscript = '';
+                            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                                if (event.results[i].isFinal) {
+                                    finalTranscript += event.results[i][0].transcript + ' ';
+                                }
                             }
-                        }
-                        if (finalTranscript.trim()) {
-                            const newPhrase = finalTranscript.trim();
-                            
-                            // Append real spoken words as Caller bubbles in real-time
-                            setSpeakerChatBubbles(prev => [
-                                ...prev,
-                                { sender: 'caller', text: newPhrase }
-                            ]);
+                            if (finalTranscript.trim()) {
+                                const newPhrase = finalTranscript.trim();
+                                setSpeakerChatBubbles(prev => [
+                                    ...prev,
+                                    { sender: 'caller', text: newPhrase }
+                                ]);
+                                setSpeakerTranscript(prev => {
+                                    const newT = (prev + " " + newPhrase).trim();
+                                    updateSpeakerBadges(newT);
+                                    analyzeSpeakerText(newT);
+                                    return newT;
+                                });
+                            }
+                        };
 
-                            setSpeakerTranscript(prev => {
-                                const newT = (prev + " " + newPhrase).trim();
-                                updateSpeakerBadges(newT);
-                                analyzeSpeakerText(newT);
-                                return newT;
-                            });
+                        recognition.onerror = (e) => {
+                            console.error("Speech recognition error:", e.error);
+                            if (e.error === 'not-allowed') {
+                                setSpeechSupportError('Microphone permission denied by browser.');
+                            }
+                        };
+
+                        recognition.onend = () => {
+                            if (speakerActiveRef.current) {
+                                setTimeout(() => {
+                                    runRecognition(); // Restart fresh
+                                }, 250);
+                            }
+                        };
+
+                        speakerRecognitionRef.current = recognition;
+                        try {
+                            recognition.start();
+                        } catch (err) {
+                            console.error("Failed to start SpeechRecognition:", err);
                         }
                     };
 
-                    recognition.onerror = (e) => {
-                        console.error("Speech recognition error:", e.error);
-                        if (e.error === 'not-allowed') {
-                            setSpeechSupportError('Microphone permission denied by browser. Please reset site permissions.');
-                        }
-                    };
-
-                    recognition.onend = () => {
-                        if (speakerActiveRef.current) {
-                            setTimeout(() => {
-                                try { recognition.start(); } catch(err) {}
-                            }, 200);
-                        }
-                    };
-
-                    speakerRecognitionRef.current = recognition;
-                    recognition.start();
+                    runRecognition();
 
                 } catch (err) {
                     console.error("Failed to acquire microphone access:", err);
@@ -1345,6 +1349,15 @@
             useEffect(() => {
                 speakerActiveRef.current = speakerActive;
             }, [speakerActive]);
+
+            useEffect(() => {
+                speakerLanguageRef.current = speakerLanguage;
+                if (speakerActiveRef.current && speakerRecognitionRef.current) {
+                    try {
+                        speakerRecognitionRef.current.stop();
+                    } catch (e) {}
+                }
+            }, [speakerLanguage]);
 
             useEffect(() => {
                 const canvas = speakerCanvasRef.current;
