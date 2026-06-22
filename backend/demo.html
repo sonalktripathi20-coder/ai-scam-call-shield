@@ -501,6 +501,7 @@
             const [speakerSimulationStep, setSpeakerSimulationStep] = useState(0); // 0: idle, 1: Call Received, 2: Mic Active, 3: Speech Transcribed, 4: AI Analysis, 5: Threat Identified, 6: Alert Generated
             const [speakerChatBubbles, setSpeakerChatBubbles] = useState([]);
             const [currentSpeakerScenario, setCurrentSpeakerScenario] = useState(null); // 'bank_otp' | 'voice_clone' | 'delivery'
+            const [speakerLanguage, setSpeakerLanguage] = useState('en-IN'); // 'en-IN' | 'hi-IN'
             const speakerTimeoutsRef = useRef([]);
             const speakerScoreIntervalRef = useRef(null);
             const [archPipelineMode, setArchPipelineMode] = useState('twilio'); // 'twilio' | 'speaker'
@@ -1093,6 +1094,31 @@
                         
                         const riskLevel = data.risk_level || data.risk_label || 'SAFE';
                         setSpeakerRiskLevel(riskLevel.toUpperCase());
+
+                        // Dynamically push an AI advisory bubble to the chat feed if risk is elevated
+                        if (scoreVal >= 70) {
+                            setSpeakerChatBubbles(prev => {
+                                const lastBubble = prev[prev.length - 1];
+                                if (lastBubble && lastBubble.sender === 'ai' && lastBubble.text.includes("CRITICAL THREAT")) {
+                                    return prev;
+                                }
+                                return [
+                                    ...prev,
+                                    { sender: 'ai', text: `CRITICAL THREAT IDENTIFIED (Confidence: ${scoreVal}%): Impersonation and OTP/financial coercion flags detected. Hang up immediately!` }
+                                ];
+                            });
+                        } else if (scoreVal >= 40) {
+                            setSpeakerChatBubbles(prev => {
+                                const lastBubble = prev[prev.length - 1];
+                                if (lastBubble && lastBubble.sender === 'ai' && lastBubble.text.includes("WARNING")) {
+                                    return prev;
+                                }
+                                return [
+                                    ...prev,
+                                    { sender: 'ai', text: `WARNING (Confidence: ${scoreVal}%): Suspicious keywords or urgency cues detected.` }
+                                ];
+                            });
+                        }
                         
                         // Map fraud category to dynamic badges
                         if (data.fraud_category) {
@@ -1207,7 +1233,7 @@
                     const recognition = new SpeechRecognitionClass();
                     recognition.continuous = true;
                     recognition.interimResults = true;
-                    recognition.lang = 'en-IN';
+                    recognition.lang = speakerLanguage;
  
                     recognition.onresult = (event) => {
                         let finalTranscript = '';
@@ -1217,8 +1243,16 @@
                             }
                         }
                         if (finalTranscript.trim()) {
+                            const newPhrase = finalTranscript.trim();
+                            
+                            // Append real spoken words as Caller bubbles in real-time
+                            setSpeakerChatBubbles(prev => [
+                                ...prev,
+                                { sender: 'caller', text: newPhrase }
+                            ]);
+
                             setSpeakerTranscript(prev => {
-                                const newT = (prev + " " + finalTranscript.trim()).trim();
+                                const newT = (prev + " " + newPhrase).trim();
                                 updateSpeakerBadges(newT);
                                 analyzeSpeakerText(newT);
                                 return newT;
@@ -1227,7 +1261,10 @@
                     };
  
                     recognition.onerror = (e) => {
-                        console.error("Speech recognition error:", e);
+                        console.error("Speech recognition error:", e.error);
+                        if (e.error === 'not-allowed') {
+                            setSpeechSupportError('Microphone permission denied by browser. Please reset site permissions.');
+                        }
                     };
  
                     recognition.onend = () => {
@@ -1241,7 +1278,13 @@
  
                 } catch (err) {
                     console.error("Failed to acquire microphone access:", err);
-                    setSpeechSupportError('Microphone Access Denied or Unsupported. Please use "Simulate Scenario Dialogue" buttons.');
+                    let errMessage = 'Microphone Access Denied. ';
+                    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                        errMessage += 'Mobile browsers block microphone access on insecure (HTTP) sites. Please deploy to HTTPS (Vercel) or use Simulation fallback buttons.';
+                    } else {
+                        errMessage += 'Please allow browser microphone access or use Simulation buttons.';
+                    }
+                    setSpeechSupportError(errMessage);
                     setSpeakerActive(true);
                     setSpeakerTelemetrySteps(prev => [...prev, "Microphone Access Failed (Using simulation fallback)", "AI Shield Enabled"]);
                 }
@@ -2454,6 +2497,33 @@
                                             <p class="text-[10px] text-slate-400 leading-relaxed font-medium">
                                                 <strong>Mobile OS Restrictions:</strong> Third-party apps cannot access call audio streams. Put call on <strong>Speaker Mode</strong> next to this mic to activate protection.
                                             </p>
+                                        </div>
+
+                                        {/* Spoken Language Selector */}
+                                        <div class="flex items-center justify-between bg-slate-900/40 p-2.5 rounded-xl border border-darkBorder/30">
+                                            <span class="text-[9px] font-black uppercase text-slate-400 tracking-wider">Acoustic Input Language:</span>
+                                            <div class="flex gap-1.5">
+                                                <button 
+                                                    onClick={() => setSpeakerLanguage('en-IN')}
+                                                    class={`px-2.5 py-1 text-[9px] font-black rounded-lg transition-all border ${
+                                                        speakerLanguage === 'en-IN' 
+                                                            ? 'bg-shieldBlue/10 border-shieldBlue text-shieldBlue' 
+                                                            : 'bg-slate-950 border-slate-800 text-slate-400'
+                                                    }`}
+                                                >
+                                                    English (India)
+                                                </button>
+                                                <button 
+                                                    onClick={() => setSpeakerLanguage('hi-IN')}
+                                                    class={`px-2.5 py-1 text-[9px] font-black rounded-lg transition-all border ${
+                                                        speakerLanguage === 'hi-IN' 
+                                                            ? 'bg-shieldBlue/10 border-shieldBlue text-shieldBlue' 
+                                                            : 'bg-slate-950 border-slate-800 text-slate-400'
+                                                    }`}
+                                                >
+                                                    Hindi (India)
+                                                </button>
+                                            </div>
                                         </div>
 
                                         {/* Waveform Visualization */}
