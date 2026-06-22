@@ -1191,43 +1191,52 @@
                 ]);
                 setSpeakerInstructionVisible(true);
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    speakerStreamRef.current = stream;
-                    setSpeakerTelemetrySteps(prev => [...prev, "Microphone Active", "AI Shield Enabled"]);
+                    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
                     setSpeakerActive(true);
                     playChime(659, 0.15);
- 
-                    try {
-                        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-                        const audioCtx = new AudioContextClass();
-                        
-                        // Force resume on mobile browsers (Safari/Chrome require this to start Web Audio)
-                        if (audioCtx.state === 'suspended') {
-                            await audioCtx.resume();
-                        }
-                        
-                        const source = audioCtx.createMediaStreamSource(stream);
-                        const analyser = audioCtx.createAnalyser();
-                        analyser.fftSize = 256;
-                        source.connect(analyser);
- 
-                        speakerAudioCtxRef.current = audioCtx;
-                        speakerAnalyserRef.current = analyser;
-                    } catch (e) {
-                        console.error("Web Audio API not fully supported:", e);
-                    }
- 
+
                     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
                     if (!SpeechRecognitionClass) {
                         setSpeechSupportError('Speech Recognition is not supported on this browser. Please use "Simulate Scenario Dialogue" buttons.');
                         return;
                     }
- 
+
+                    if (isMobileDevice) {
+                        // Mobile: Skip raw getUserMedia/AudioContext to prevent device microphone stream conflicts
+                        setSpeakerTelemetrySteps(prev => [...prev, "Microphone Active (Mobile Optimized)", "AI Shield Enabled"]);
+                    } else {
+                        // Desktop: Connect Web Audio analyser for real-time waveform
+                        try {
+                            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                            speakerStreamRef.current = stream;
+                            setSpeakerTelemetrySteps(prev => [...prev, "Microphone Active", "AI Shield Enabled"]);
+
+                            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                            const audioCtx = new AudioContextClass();
+                            
+                            // Force resume on mobile browsers
+                            if (audioCtx.state === 'suspended') {
+                                await audioCtx.resume();
+                            }
+                            
+                            const source = audioCtx.createMediaStreamSource(stream);
+                            const analyser = audioCtx.createAnalyser();
+                            analyser.fftSize = 256;
+                            source.connect(analyser);
+
+                            speakerAudioCtxRef.current = audioCtx;
+                            speakerAnalyserRef.current = analyser;
+                        } catch (e) {
+                            console.error("Web Audio API not fully supported:", e);
+                            setSpeakerTelemetrySteps(prev => [...prev, "Microphone Active (Fallback Mode)", "AI Shield Enabled"]);
+                        }
+                    }
+
                     const recognition = new SpeechRecognitionClass();
                     recognition.continuous = true;
                     recognition.interimResults = true;
                     recognition.lang = speakerLanguage;
- 
+
                     recognition.onresult = (event) => {
                         let finalTranscript = '';
                         for (let i = event.resultIndex; i < event.results.length; ++i) {
@@ -1243,7 +1252,7 @@
                                 ...prev,
                                 { sender: 'caller', text: newPhrase }
                             ]);
- 
+
                             setSpeakerTranscript(prev => {
                                 const newT = (prev + " " + newPhrase).trim();
                                 updateSpeakerBadges(newT);
@@ -1252,23 +1261,23 @@
                             });
                         }
                     };
- 
+
                     recognition.onerror = (e) => {
                         console.error("Speech recognition error:", e.error);
                         if (e.error === 'not-allowed') {
                             setSpeechSupportError('Microphone permission denied by browser. Please reset site permissions.');
                         }
                     };
- 
+
                     recognition.onend = () => {
                         if (speakerActive) {
                             try { recognition.start(); } catch(err) {}
                         }
                     };
- 
+
                     speakerRecognitionRef.current = recognition;
                     recognition.start();
- 
+
                 } catch (err) {
                     console.error("Failed to acquire microphone access:", err);
                     let errMessage = 'Microphone Access Denied. ';
