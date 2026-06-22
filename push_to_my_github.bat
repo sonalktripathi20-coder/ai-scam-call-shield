@@ -12,6 +12,11 @@ echo.
 set repo_url=https://github.com/sonalktripathi20-coder/ai-scam-call-shield.git
 
 echo.
+echo Undoing local bloated commit...
+git reset --mixed HEAD~1 >nul 2>&1
+git rm --cached ai_scam_call_shield_project.zip >nul 2>&1
+
+echo.
 echo Removing old remote configurations...
 git remote remove origin >nul 2>&1
 git remote add origin %repo_url%
@@ -29,6 +34,7 @@ echo *.pyc
 echo *.db
 echo *.log
 echo *.apk
+echo *.zip
 echo .gradle/
 echo **/build/
 echo android-app-project/.gradle/
@@ -36,6 +42,7 @@ echo android-app-project/.gradle/
 
 echo.
 echo Untracking heavy files from git memory (index)...
+git rm --cached ai_scam_call_shield_project.zip >nul 2>&1
 git rm -r --cached backend/venv >nul 2>&1
 git rm -r --cached spring-boot-backend/target >nul 2>&1
 git rm -r --cached mobile-app/node_modules >nul 2>&1

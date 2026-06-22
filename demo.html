@@ -179,6 +179,12 @@
                         <polyline points="12 5 19 12 12 19" />
                     </>
                 ),
+                mic: (
+                    <>
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 19v4M8 23h8" />
+                    </>
+                ),
                 chevronDown: (
                     <polyline points="6 9 12 15 18 9" />
                 )
@@ -470,6 +476,42 @@
             const [simRisk, setSimRisk] = useState('LOW');
             const [simActiveIndicators, setSimActiveIndicators] = useState([]);
 
+            // Speaker Mode Demo States
+            const [speakerActive, setSpeakerActive] = useState(false);
+            const [speakerTranscript, setSpeakerTranscript] = useState('');
+            const [speakerScore, setSpeakerScore] = useState(0);
+            const [speakerRiskLevel, setSpeakerRiskLevel] = useState('SAFE');
+            const [speakerBadges, setSpeakerBadges] = useState({
+                unknownCaller: true,
+                otpRequest: false,
+                moneyTransfer: false,
+                urgencyDetected: false,
+                possibleSyntheticSpeech: false
+            });
+            const [isSimulatingSpeaker, setIsSimulatingSpeaker] = useState(false);
+            const [speakerInstructionVisible, setSpeakerInstructionVisible] = useState(false);
+            const [speakerTelemetrySteps, setSpeakerTelemetrySteps] = useState([
+                "📞 Unknown Caller Detected",
+                "Monitoring Started",
+                "Microphone Active",
+                "AI Shield Enabled"
+            ]);
+            const [speechSupportError, setSpeechSupportError] = useState('');
+            const [speakerDuration, setSpeakerDuration] = useState(0);
+            const [speakerSimulationStep, setSpeakerSimulationStep] = useState(0); // 0: idle, 1: Call Received, 2: Mic Active, 3: Speech Transcribed, 4: AI Analysis, 5: Threat Identified, 6: Alert Generated
+            const [speakerChatBubbles, setSpeakerChatBubbles] = useState([]);
+            const [currentSpeakerScenario, setCurrentSpeakerScenario] = useState(null); // 'bank_otp' | 'voice_clone' | 'delivery'
+            const speakerTimeoutsRef = useRef([]);
+            const speakerScoreIntervalRef = useRef(null);
+            const [archPipelineMode, setArchPipelineMode] = useState('twilio'); // 'twilio' | 'speaker'
+
+            const speakerMediaRecorderRef = useRef(null);
+            const speakerAudioChunksRef = useRef([]);
+            const speakerAnalyserRef = useRef(null);
+            const speakerAudioCtxRef = useRef(null);
+            const speakerRecognitionRef = useRef(null);
+            const speakerCanvasRef = useRef(null);
+
             // Log database
             const [reports, setReports] = useState([
                 { id: "REP-9104", caller: "+91 94480 32185", date: "Today, 04:32 PM", type: "Bank Verification Scam", risk: "HIGH", explanation: "Target asked for credit card freeze verification and requested a 6-digit OTP code." },
@@ -480,27 +522,80 @@
             // Trusted Profiles State
             const [trustedProfiles, setTrustedProfiles] = useState([]);
 
-            useEffect(() => {
-                const saved = localStorage.getItem('trustedProfiles_' + userId);
-                if (saved) {
-                    try {
-                        setTrustedProfiles(JSON.parse(saved));
-                        return;
-                    } catch (e) {
-                        console.error("Error parsing saved profiles:", e);
+            const fetchVoiceProfiles = async () => {
+                try {
+                    const res = await fetch('/api/voice-profiles', {
+                        headers: {
+                            'x-user-id': userId
+                        }
+                    });
+                    let backendData = [];
+                    if (res.ok) {
+                        backendData = await res.json();
                     }
+                    
+                    // Load local voice profiles from localStorage
+                    let localData = [];
+                    try {
+                        const saved = localStorage.getItem('scamShieldVoiceProfiles');
+                        if (saved) {
+                            localData = JSON.parse(saved);
+                        }
+                    } catch(e) {}
+                    
+                    // Merge local voice profiles and backend voice profiles
+                    const combined = [...backendData, ...localData];
+                    const uniqueMap = new Map();
+                    combined.forEach(p => {
+                        // Only show profiles belonging to the current user (or default user)
+                        if (p && p.phone && (p.user_id === userId || p.user_id === 'default_user' || !p.user_id)) {
+                            uniqueMap.set(p.phone, p);
+                        }
+                    });
+                    
+                    // Ensure the two default system voice profiles are always present
+                    const defaults = [
+                        {
+                            id: 1,
+                            user_id: 'default_user',
+                            name: "Sonal Tripathi",
+                            role: "Son",
+                            phone: "+91 70192 38491",
+                            hash: "98a3b50c18d9f4e2...",
+                            status: "Voice Authenticated",
+                            date: "June 12, 2026",
+                            features: "Pitch: 142.4Hz, HNR: 11.4dB",
+                            audio_data: "/static/sample_audio.wav"
+                        },
+                        {
+                            id: 2,
+                            user_id: 'default_user',
+                            name: "Family Backup Desk",
+                            role: "Backup",
+                            phone: "+91 80012 34567",
+                            hash: "41b2c3d4e5f6a7b8...",
+                            status: "Vault Enrolled",
+                            date: "June 13, 2026",
+                            features: "Pitch: 210.8Hz, HNR: 14.8dB"
+                        }
+                    ];
+                    defaults.forEach(d => {
+                        if (!uniqueMap.has(d.phone)) {
+                            uniqueMap.set(d.phone, d);
+                        }
+                    });
+                    
+                    const uniqueProfiles = Array.from(uniqueMap.values());
+                    setTrustedProfiles(uniqueProfiles);
+                    localStorage.setItem('scamShieldVoiceProfiles', JSON.stringify(uniqueProfiles));
+                } catch(err) {
+                    console.error("Error loading voice profiles:", err);
                 }
-                setTrustedProfiles([
-                    { id: 1, name: "Sonal Tripathi", role: "Son", phone: "+91 70192 38491", hash: "98a3b50c18d9f4e2...", status: "Voice Authenticated", date: "June 12, 2026", features: "Pitch: 142.4Hz, HNR: 11.4dB" },
-                    { id: 2, name: "Family Backup Desk", role: "Backup", phone: "+91 80012 34567", hash: "41b2c3d4e5f6a7b8...", status: "Vault Enrolled", date: "June 13, 2026", features: "Pitch: 210.8Hz, HNR: 14.8dB" }
-                ]);
-            }, [userId]);
+            };
 
             useEffect(() => {
-                if (userId && trustedProfiles.length > 0) {
-                    localStorage.setItem('trustedProfiles_' + userId, JSON.stringify(trustedProfiles));
-                }
-            }, [trustedProfiles, userId]);
+                fetchVoiceProfiles();
+            }, [userId]);
             const [newProfileName, setNewProfileName] = useState('');
             const [newProfilePhone, setNewProfilePhone] = useState('');
             const [newProfileRole, setNewProfileRole] = useState('Son');
@@ -852,13 +947,12 @@
                     setEnrollProgress('Profile registered successfully!');
                     playChime(880, 0.25);
 
-                    // Add new profile
+                    // Add new profile to database via API
                     const randPitch = (120 + Math.random() * 90).toFixed(1);
                     const randHNR = (10 + Math.random() * 6).toFixed(1);
                     const randHash = 'sha256_' + Math.floor(Math.random() * 1000000).toString(16).padEnd(8, 'f');
                     
                     const newProfile = {
-                        id: trustedProfiles.length + 1,
                         name: newProfileName,
                         role: newProfileRole,
                         phone: newProfilePhone,
@@ -866,18 +960,63 @@
                         status: 'Voice Authenticated',
                         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
                         features: `Pitch: ${randPitch}Hz, HNR: ${randHNR}dB`,
-                        audioUrl: currentVoiceBase64
+                        audio_data: currentVoiceBase64
                     };
 
-                    setTrustedProfiles(prev => [...prev, newProfile]);
-                    setEnrollState('success');
-                    setCurrentVoiceBase64(null);
+                    const tempId = Date.now();
+                    const newProfileLocal = {
+                        ...newProfile,
+                        id: tempId,
+                        user_id: userId
+                    };
                     
-                    // Reset
-                    setNewProfileName('');
-                    setNewProfilePhone('');
-                    setSelectedFileName('');
-                    resetRecording();
+                    // Save to local state and local storage immediately for offline resilience
+                    let savedLocal = [];
+                    try {
+                        const saved = localStorage.getItem('scamShieldVoiceProfiles');
+                        if (saved) savedLocal = JSON.parse(saved);
+                    } catch(e) {}
+                    savedLocal.push(newProfileLocal);
+                    localStorage.setItem('scamShieldVoiceProfiles', JSON.stringify(savedLocal));
+                    setTrustedProfiles(savedLocal);
+
+                    fetch('/api/voice-profiles', {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'x-user-id': userId
+                        },
+                        body: JSON.stringify(newProfile)
+                    })
+                    .then(res => {
+                        if (!res.ok) throw new Error("A profile with this phone number is already enrolled.");
+                        return res.json();
+                    })
+                    .then(dbProfile => {
+                        // Replace temp local profile with database profile to get actual id
+                        let savedLocalCurrent = [];
+                        try {
+                            const saved = localStorage.getItem('scamShieldVoiceProfiles');
+                            if (saved) savedLocalCurrent = JSON.parse(saved);
+                        } catch(e) {}
+                        const updatedLocal = savedLocalCurrent.map(p => p.phone === dbProfile.phone ? dbProfile : p);
+                        localStorage.setItem('scamShieldVoiceProfiles', JSON.stringify(updatedLocal));
+                        
+                        setTrustedProfiles(updatedLocal);
+                        setEnrollState('success');
+                        setCurrentVoiceBase64(null);
+                        
+                        // Reset
+                        setNewProfileName('');
+                        setNewProfilePhone('');
+                        setSelectedFileName('');
+                        resetRecording();
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert(err.message);
+                        setEnrollState('idle');
+                    });
                     
                     setTimeout(() => {
                         setEnrollState('idle');
@@ -933,6 +1072,550 @@
                     setPlayingProfileId(profile.id);
                 }
             };
+ 
+            // ─────────────────────────────────────────────
+            // Speaker Mode Demo logic
+            // ─────────────────────────────────────────────
+ 
+            const analyzeSpeakerText = async (text) => {
+                if (!text) return;
+                try {
+                    const res = await fetch('/api/analyze-text', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: text })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        // Support both backend risk_score (0-100) or confidence/fraud_score (0-1)
+                        const scoreVal = data.risk_score !== undefined ? data.risk_score : Math.round((data.fraud_score || data.confidence_score || 0) * 100);
+                        setSpeakerScore(scoreVal);
+                        
+                        const riskLevel = data.risk_level || data.risk_label || 'SAFE';
+                        setSpeakerRiskLevel(riskLevel.toUpperCase());
+                        
+                        // Map fraud category to dynamic badges
+                        if (data.fraud_category) {
+                            const cat = data.fraud_category.toLowerCase();
+                            const otpReq = cat.includes("otp") || text.toLowerCase().includes("otp");
+                            const moneyTrans = cat.includes("upi") || cat.includes("payment") || cat.includes("money") || cat.includes("bank") || text.toLowerCase().includes("transfer") || text.toLowerCase().includes("pay");
+                            const urgency = cat.includes("urgency") || cat.includes("police") || cat.includes("government") || cat.includes("customs") || text.toLowerCase().includes("immediately") || text.toLowerCase().includes("urgent");
+                            
+                            setSpeakerBadges(prev => ({
+                                ...prev,
+                                otpRequest: prev.otpRequest || otpReq,
+                                moneyTransfer: prev.moneyTransfer || moneyTrans,
+                                urgencyDetected: prev.urgencyDetected || urgency
+                            }));
+                        }
+                        
+                        setSpeakerTelemetrySteps(prev => {
+                            const newSteps = [...prev];
+                            if (!newSteps.includes("Transcript Received")) {
+                                newSteps.push("Transcript Received");
+                            }
+                            if (!newSteps.includes("Risk Score Updated")) {
+                                newSteps.push("Risk Score Updated");
+                            }
+                            if (scoreVal >= 70 && !newSteps.includes("Scam Warning Generated")) {
+                                newSteps.push("Scam Warning Generated");
+                            }
+                            return newSteps;
+                        });
+                    }
+                } catch (e) {
+                    console.error("Error calling analyze-text api:", e);
+                }
+            };
+ 
+            const updateSpeakerBadges = (transcriptText) => {
+                const lower = transcriptText.toLowerCase();
+                const otpReq = lower.includes("otp") || lower.includes("verification") || lower.includes("code") || lower.includes("pin");
+                const moneyTrans = lower.includes("transfer") || lower.includes("money") || lower.includes("pay") || lower.includes("upi") || lower.includes("bank") || lower.includes("rupees") || lower.includes("gift card") || lower.includes("refund");
+                const urgency = lower.includes("immediately") || lower.includes("arrest") || lower.includes("police") || lower.includes("urgent") || lower.includes("blocked") || lower.includes("kyc") || lower.includes("customs");
+ 
+                setSpeakerBadges(prev => ({
+                    ...prev,
+                    otpRequest: prev.otpRequest || otpReq,
+                    moneyTransfer: prev.moneyTransfer || moneyTrans,
+                    urgencyDetected: prev.urgencyDetected || urgency
+                }));
+            };
+ 
+            const startSpeakerListening = async () => {
+                setSpeakerDuration(0);
+                setSpeakerSimulationStep(1); // Active listening starts call monitoring
+                setSpeakerChatBubbles([]);
+                setCurrentSpeakerScenario(null);
+                setSpeakerScore(0);
+                setSpeakerRiskLevel('SAFE');
+                setSpeakerTranscript('');
+                setSpeechSupportError('');
+                setSpeakerBadges({
+                    unknownCaller: true,
+                    otpRequest: false,
+                    moneyTransfer: false,
+                    urgencyDetected: false,
+                    possibleSyntheticSpeech: false
+                });
+                setSpeakerTelemetrySteps([
+                    "📞 Unknown Caller Detected",
+                    "Monitoring Started"
+                ]);
+                setSpeakerInstructionVisible(true);
+ 
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    setSpeakerTelemetrySteps(prev => [...prev, "Microphone Active", "AI Shield Enabled"]);
+                    setSpeakerActive(true);
+                    playChime(659, 0.15);
+ 
+                    try {
+                        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                        const audioCtx = new AudioContextClass();
+                        const source = audioCtx.createMediaStreamSource(stream);
+                        const analyser = audioCtx.createAnalyser();
+                        analyser.fftSize = 256;
+                        source.connect(analyser);
+ 
+                        speakerAudioCtxRef.current = audioCtx;
+                        speakerAnalyserRef.current = analyser;
+                    } catch (e) {
+                        console.error("Web Audio API not fully supported:", e);
+                    }
+ 
+                    try {
+                        const mediaRecorder = new MediaRecorder(stream);
+                        speakerMediaRecorderRef.current = mediaRecorder;
+                        speakerAudioChunksRef.current = [];
+                        mediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) {
+                                speakerAudioChunksRef.current.push(event.data);
+                            }
+                        };
+                        mediaRecorder.start(1000);
+                    } catch (e) {
+                        console.error("MediaRecorder setup failed:", e);
+                    }
+ 
+                    const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
+                    if (!SpeechRecognitionClass) {
+                        setSpeechSupportError('Speech Recognition is not supported on this browser. Please use "Simulate Scenario Dialogue" buttons.');
+                        return;
+                    }
+ 
+                    const recognition = new SpeechRecognitionClass();
+                    recognition.continuous = true;
+                    recognition.interimResults = true;
+                    recognition.lang = 'en-IN';
+ 
+                    recognition.onresult = (event) => {
+                        let finalTranscript = '';
+                        for (let i = event.resultIndex; i < event.results.length; ++i) {
+                            if (event.results[i].isFinal) {
+                                finalTranscript += event.results[i][0].transcript + ' ';
+                            }
+                        }
+                        if (finalTranscript.trim()) {
+                            setSpeakerTranscript(prev => {
+                                const newT = (prev + " " + finalTranscript.trim()).trim();
+                                updateSpeakerBadges(newT);
+                                analyzeSpeakerText(newT);
+                                return newT;
+                            });
+                        }
+                    };
+ 
+                    recognition.onerror = (e) => {
+                        console.error("Speech recognition error:", e);
+                    };
+ 
+                    recognition.onend = () => {
+                        if (speakerActive) {
+                            try { recognition.start(); } catch(err) {}
+                        }
+                    };
+ 
+                    speakerRecognitionRef.current = recognition;
+                    recognition.start();
+ 
+                } catch (err) {
+                    console.error("Failed to acquire microphone access:", err);
+                    setSpeechSupportError('Microphone Access Denied or Unsupported. Please use "Simulate Scenario Dialogue" buttons.');
+                    setSpeakerActive(true);
+                    setSpeakerTelemetrySteps(prev => [...prev, "Microphone Access Failed (Using simulation fallback)", "AI Shield Enabled"]);
+                }
+            };
+ 
+            const stopSpeakerListening = () => {
+                setSpeakerActive(false);
+                setSpeakerInstructionVisible(false);
+                setIsSimulatingSpeaker(false);
+
+                // Cancel all scheduled simulation timeouts
+                speakerTimeoutsRef.current.forEach(t => clearTimeout(t));
+                speakerTimeoutsRef.current = [];
+
+                if (speakerScoreIntervalRef.current) {
+                    clearInterval(speakerScoreIntervalRef.current);
+                    speakerScoreIntervalRef.current = null;
+                }
+ 
+                if (speakerMediaRecorderRef.current && speakerMediaRecorderRef.current.state !== 'inactive') {
+                    try { speakerMediaRecorderRef.current.stop(); } catch(e) {}
+                }
+                if (speakerMediaRecorderRef.current && speakerMediaRecorderRef.current.stream) {
+                    speakerMediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+                }
+                if (speakerRecognitionRef.current) {
+                    try { speakerRecognitionRef.current.stop(); } catch(e) {}
+                }
+                if (speakerAudioCtxRef.current) {
+                    try { speakerAudioCtxRef.current.close(); } catch(e) {}
+                }
+                playChime(330, 0.2);
+            };
+
+            // Call Duration Count-Up Timer
+            useEffect(() => {
+                let interval;
+                if (speakerActive) {
+                    interval = setInterval(() => {
+                        setSpeakerDuration(prev => prev + 1);
+                    }, 1000);
+                } else {
+                    clearInterval(interval);
+                }
+                return () => clearInterval(interval);
+            }, [speakerActive]);
+ 
+            useEffect(() => {
+                const canvas = speakerCanvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+ 
+                let animationFrameId;
+                let phase = 0;
+ 
+                const drawWave = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    const width = canvas.width;
+                    const height = canvas.height;
+                    const midY = height / 2;
+ 
+                    const isHighRisk = speakerScore > 70;
+                    ctx.strokeStyle = isHighRisk ? 'rgba(239, 68, 68, 0.85)' : 'rgba(56, 189, 248, 0.85)';
+                    ctx.shadowColor = isHighRisk ? '#ef4444' : '#38bdf8';
+                    ctx.shadowBlur = 10;
+                    ctx.lineWidth = 2;
+ 
+                    ctx.beginPath();
+ 
+                    if (speakerActive && speakerAnalyserRef.current) {
+                        const bufferLength = speakerAnalyserRef.current.frequencyBinCount;
+                        const dataArray = new Uint8Array(bufferLength);
+                        speakerAnalyserRef.current.getByteTimeDomainData(dataArray);
+ 
+                        for (let i = 0; i < bufferLength; i++) {
+                            const x = (i / bufferLength) * width;
+                            const v = dataArray[i] / 128.0;
+                            const y = v * midY;
+                            
+                            if (i === 0) {
+                                    ctx.moveTo(x, y);
+                            } else {
+                                    ctx.lineTo(x, y);
+                            }
+                        }
+                    } else if (speakerActive) {
+                        phase += 0.15;
+                        const amp = isHighRisk ? 25 : 12;
+                        for (let x = 0; x < width; x++) {
+                            const y = midY + Math.sin(x * 0.05 + phase) * amp * Math.sin(x * 0.01);
+                            if (x === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        }
+                    } else {
+                        ctx.moveTo(0, midY);
+                        ctx.lineTo(width, midY);
+                    }
+ 
+                    ctx.stroke();
+ 
+                    if (speakerActive) {
+                        ctx.lineWidth = 1;
+                        ctx.strokeStyle = isHighRisk ? 'rgba(239, 68, 68, 0.25)' : 'rgba(56, 189, 248, 0.25)';
+                        ctx.shadowBlur = 0;
+                        ctx.beginPath();
+                        phase += 0.02;
+                        const amp2 = isHighRisk ? 15 : 6;
+                        for (let x = 0; x < width; x++) {
+                            const y = midY + Math.sin(x * 0.08 - phase) * amp2 * Math.cos(x * 0.015);
+                            if (x === 0) {
+                                ctx.moveTo(x, y);
+                            } else {
+                                ctx.lineTo(x, y);
+                            }
+                        }
+                        ctx.stroke();
+                    }
+ 
+                    animationFrameId = requestAnimationFrame(drawWave);
+                };
+ 
+                drawWave();
+ 
+                return () => {
+                    cancelAnimationFrame(animationFrameId);
+                };
+            }, [speakerActive, speakerScore]);
+ 
+            const startSimulatedSpeakerCall = (scenarioKey) => {
+                setSpeakerActive(true);
+                setIsSimulatingSpeaker(true);
+                setSpeakerInstructionVisible(true);
+                setCurrentSpeakerScenario(scenarioKey);
+                setSpeakerDuration(0);
+                setSpeakerSimulationStep(1); // Call Received
+                setSpeakerScore(0);
+                setSpeakerRiskLevel('SAFE');
+                setSpeakerTranscript('');
+                setSpeakerChatBubbles([]);
+                setSpeakerBadges({
+                    unknownCaller: true,
+                    otpRequest: false,
+                    moneyTransfer: false,
+                    urgencyDetected: false,
+                    possibleSyntheticSpeech: false
+                });
+
+                playChime(523, 0.3);
+
+                // Cancel any running timeouts
+                speakerTimeoutsRef.current.forEach(t => clearTimeout(t));
+                speakerTimeoutsRef.current = [];
+
+                if (speakerScoreIntervalRef.current) {
+                    clearInterval(speakerScoreIntervalRef.current);
+                    speakerScoreIntervalRef.current = null;
+                }
+
+                // Step 2: Mic Activated (t=1.5s)
+                speakerTimeoutsRef.current.push(setTimeout(() => {
+                    setSpeakerSimulationStep(2);
+                    playChime(587, 0.1);
+                }, 1500));
+
+                // Step 3: Speech Transcribed (t=3s)
+                speakerTimeoutsRef.current.push(setTimeout(() => {
+                    setSpeakerSimulationStep(3);
+                    playChime(659, 0.1);
+                    if (scenarioKey === 'bank_otp') {
+                        setSpeakerChatBubbles([
+                            { sender: 'caller', text: "Hello, this is SBI customer verification. We found suspicious activity." },
+                            { sender: 'ai', text: "🔍 NLP Detection: Brand Impersonation pattern flagged" }
+                        ]);
+                        setSpeakerTranscript("Hello, this is SBI customer verification. We found suspicious activity.");
+                    } else if (scenarioKey === 'voice_clone') {
+                        setSpeakerChatBubbles([
+                            { sender: 'caller', text: "Papa, main Sonal bol rahi hoon. Please listen, my phone is damaged." },
+                            { sender: 'ai', text: "🔍 Biometric mismatch: Synthetic acoustic voice signature matched" }
+                        ]);
+                        setSpeakerTranscript("Papa, main Sonal bol rahi hoon. Please listen, my phone is damaged.");
+                        setSpeakerBadges(prev => ({ ...prev, possibleSyntheticSpeech: true }));
+                    } else {
+                        setSpeakerChatBubbles([
+                            { sender: 'caller', text: "Hello, courier service here. Your Amazon parcel is at the gate." },
+                            { sender: 'ai', text: "✅ Pattern normal: Low-risk greeting intent verified" }
+                        ]);
+                        setSpeakerTranscript("Hello, courier service here. Your Amazon parcel is at the gate.");
+                    }
+                }, 3000));
+
+                // Step 4: AI Analysis Running (t=5s)
+                speakerTimeoutsRef.current.push(setTimeout(() => {
+                    setSpeakerSimulationStep(4);
+                    playChime(698, 0.1);
+                    if (scenarioKey === 'bank_otp') {
+                        setSpeakerChatBubbles(prev => [
+                            ...prev,
+                            { sender: 'caller', text: "Your credit card will be blocked immediately if you do not verify now." },
+                            { sender: 'ai', text: "🚨 NLP Detection: High urgency coercion phrase matched" }
+                        ]);
+                        setSpeakerTranscript(prev => prev + " Your credit card will be blocked immediately if you do not verify now.");
+                        setSpeakerBadges(prev => ({ ...prev, urgencyDetected: true }));
+                    } else if (scenarioKey === 'voice_clone') {
+                        setSpeakerChatBubbles(prev => [
+                            ...prev,
+                            { sender: 'caller', text: "Mujhe urgently rupees 10,000 transfer karo online bills pay karne ke liye." },
+                            { sender: 'ai', text: "🚨 NLP Detection: Financial urgency request" }
+                        ]);
+                        setSpeakerTranscript(prev => prev + " Mujhe urgently rupees 10,000 transfer karo online bills pay karne ke liye.");
+                        setSpeakerBadges(prev => ({ ...prev, urgencyDetected: true, moneyTransfer: true }));
+                    } else {
+                        setSpeakerChatBubbles(prev => [
+                            ...prev,
+                            { sender: 'caller', text: "Please collect it when you have time, no payment is due." },
+                            { sender: 'ai', text: "✅ Content safe: Standard logistics check" }
+                        ]);
+                        setSpeakerTranscript(prev => prev + " Please collect it when you have time, no payment is due.");
+                    }
+                }, 5000));
+
+                // Step 5: Threat Identified / Risk Scoring (t=7s)
+                speakerTimeoutsRef.current.push(setTimeout(() => {
+                    setSpeakerSimulationStep(5);
+                    playChime(784, 0.1);
+                    
+                    let targetS = 0;
+                    if (scenarioKey === 'bank_otp') {
+                        setSpeakerChatBubbles(prev => [
+                            ...prev,
+                            { sender: 'caller', text: "Please share the 6-digit OTP code sent to your phone right now." },
+                            { sender: 'ai', text: "❌ High Risk: Direct credential/OTP extortion request" }
+                        ]);
+                        setSpeakerTranscript(prev => prev + " Please share the 6-digit OTP code sent to your phone right now.");
+                        setSpeakerBadges(prev => ({ ...prev, otpRequest: true }));
+                        targetS = 92;
+                    } else if (scenarioKey === 'voice_clone') {
+                        setSpeakerChatBubbles(prev => [
+                            ...prev,
+                            { sender: 'caller', text: "Mera phone drop ho gaya tha clinic me. Jaldi UPI transfer kar do." },
+                            { sender: 'ai', text: "❌ High Risk: Cloned voice requesting emergency UPI fund transfer" }
+                        ]);
+                        setSpeakerTranscript(prev => prev + " Mera phone drop ho gaya tha clinic me. Jaldi UPI transfer kar do.");
+                        targetS = 96;
+                    } else {
+                        setSpeakerChatBubbles(prev => [
+                            ...prev,
+                            { sender: 'caller', text: "Okay, leaving it with the security guard. Have a good day." },
+                            { sender: 'ai', text: "✅ Safe check: Logistics handover completed" }
+                        ]);
+                        setSpeakerTranscript(prev => prev + " Okay, leaving it with the security guard. Have a good day.");
+                        targetS = 12;
+                    }
+
+                    let currentS = 0;
+                    speakerScoreIntervalRef.current = setInterval(() => {
+                        currentS += 4;
+                        if (currentS >= targetS) {
+                            currentS = targetS;
+                            if (speakerScoreIntervalRef.current) {
+                                clearInterval(speakerScoreIntervalRef.current);
+                                speakerScoreIntervalRef.current = null;
+                            }
+                        }
+                        setSpeakerScore(currentS);
+                    }, 40);
+                }, 7000));
+
+                // Step 6: Alert Generated (t=9s)
+                speakerTimeoutsRef.current.push(setTimeout(() => {
+                    setSpeakerSimulationStep(6);
+                    if (scenarioKey === 'bank_otp') {
+                        setSpeakerRiskLevel('FRAUD');
+                        playChime(880, 0.35);
+                    } else if (scenarioKey === 'voice_clone') {
+                        setSpeakerRiskLevel('FRAUD');
+                        playChime(880, 0.35);
+                    } else {
+                        setSpeakerRiskLevel('SAFE');
+                        playChime(523, 0.2);
+                    }
+                    setIsSimulatingSpeaker(false);
+                }, 9000));
+            };
+
+            const _unusedSpeakerCall = (scenarioKey) => {
+ 
+                playChime(523, 0.3);
+ 
+                const scenarios = {
+                    bank_otp: {
+                        transcript: "Sir your account will be blocked. Share your OTP immediately to verify bank details.",
+                        score: 94,
+                        risk: "FRAUD",
+                        badges: {
+                            unknownCaller: true,
+                            otpRequest: true,
+                            moneyTransfer: true,
+                            urgencyDetected: true,
+                            possibleSyntheticSpeech: false
+                        }
+                    },
+                    voice_clone: {
+                        transcript: "Papa main Sonal bol rahi hoon. Mujhe urgently paise chahiye. Account block hone wala hai.",
+                        score: 96,
+                        risk: "FRAUD",
+                        badges: {
+                            unknownCaller: true,
+                            otpRequest: false,
+                            moneyTransfer: true,
+                            urgencyDetected: true,
+                            possibleSyntheticSpeech: true
+                        }
+                    },
+                    delivery: {
+                        transcript: "Sir your parcel is at the gate. Please pick it up.",
+                        score: 7,
+                        risk: "SAFE",
+                        badges: {
+                            unknownCaller: true,
+                            otpRequest: false,
+                            moneyTransfer: false,
+                            urgencyDetected: false,
+                            possibleSyntheticSpeech: false
+                        }
+                    }
+                };
+ 
+                const chosen = scenarios[scenarioKey];
+                if (!chosen) return;
+ 
+                setTimeout(() => {
+                    setSpeakerTranscript(chosen.transcript);
+                    setSpeakerTelemetrySteps(prev => [...prev, "Transcript Received"]);
+                    playChime(784, 0.1);
+                    setSpeakerBadges(chosen.badges);
+                }, 2000);
+ 
+                setTimeout(() => {
+                    setSpeakerScore(chosen.score);
+                    setSpeakerRiskLevel(chosen.risk);
+                    setSpeakerTelemetrySteps(prev => [...prev, "Risk Score Updated"]);
+                    playChime(784, 0.1);
+                }, 4000);
+ 
+                setTimeout(() => {
+                    if (chosen.score >= 70) {
+                        setSpeakerTelemetrySteps(prev => [...prev, "Scam Warning Generated"]);
+                        playChime(880, 0.3);
+                    }
+                    setIsSimulatingSpeaker(false);
+                }, 5500);
+            };
+ 
+            const handleSaveSpeakerIncident = () => {
+                const newReport = {
+                    id: "REP-SPK-" + Math.floor(1000 + Math.random() * 9000),
+                    caller: "+91 " + (speakerBadges.possibleSyntheticSpeech ? "70192 38491 (AI Cloned)" : "90123 45678 (Unknown)"),
+                    date: new Date().toLocaleTimeString() + ", Today",
+                    type: speakerScore >= 70 ? (speakerBadges.possibleSyntheticSpeech ? "AI Voice Clone Impersonation" : "Bank Fraud Extortion") : "Safe Verification Call",
+                    risk: speakerScore >= 70 ? "CRITICAL" : speakerScore >= 40 ? "HIGH" : "LOW",
+                    explanation: speakerTranscript.substring(0, 80) + "...",
+                    score: speakerScore,
+                    transcript: speakerTranscript
+                };
+                setReports(prev => [newReport, ...prev]);
+                alert("Incident evidence log saved successfully! You can view it in the Threat Reports screen.");
+            };
+
+
 
             const handleSyncDatabase = () => {
                 if (dbSyncState === 'syncing' || dbSyncState === 'synced') return;
@@ -1055,7 +1738,7 @@
                                 playChime(330, 0.4); // Disconnect chime
                                 setTimeout(() => {
                                     blockAndSave();
-                                }, 1500);
+                                }, 1505);
                             }
                         }
 
@@ -1130,6 +1813,7 @@
                                 {[
                                     { id: 'dashboard', label: 'Dashboard', icon: 'shield' },
                                     { id: 'live', label: 'Live Shield', icon: 'phone' },
+                                    { id: 'speaker', label: 'Speaker Shield', icon: 'mic' },
                                     { id: 'reports', label: 'Threat Reports', icon: 'history' },
                                     { id: 'profiles', label: 'Trusted Profiles', icon: 'users' },
                                     { id: 'architecture', label: 'AI Detection Pipeline', icon: 'cpu' },
@@ -1222,6 +1906,247 @@
                                 
                                 {/* Dashboard Left: Status & Tasks Checklist */}
                                 <div class="md:col-span-8 flex flex-col gap-6">
+                                    {/* SPEAKER MODE REAL-WORLD PROTOTYPE CARD (Moved to tab) */}
+                                    {false && (
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden border border-shieldBlue/25 shadow-glowBlue">
+                                        <div class="absolute inset-0 bg-gradient-to-r from-shieldBlue/5 to-transparent pointer-events-none"></div>
+                                        <div class="flex items-center justify-between">
+                                            <h2 class="text-md font-extrabold text-slate-200 tracking-wider flex items-center gap-2">
+                                                <span>📞 SPEAKER MODE DEMO (REAL-WORLD PROTOTYPE)</span>
+                                                <span class="text-[9px] px-2 py-0.5 bg-shieldBlue/15 text-shieldBlue rounded-full font-mono font-bold animate-pulse">MIC ACTIVE LAYER</span>
+                                            </h2>
+                                        </div>
+
+                                        <p class="text-xs text-slate-400 leading-normal">
+                                            Since third-party applications cannot directly capture native call audio due to mobile OS sandbox restrictions, this module uses microphone-based acquisition. Put your phone call on speaker mode next to this device.
+                                        </p>
+
+                                        {/* Waveform & Control Panel */}
+                                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                                            {/* Waveform Canvas */}
+                                            <div class="md:col-span-6 bg-slate-950 border border-darkBorder rounded-xl p-3 flex flex-col gap-2 relative">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Acoustic Telemetry Waveform</span>
+                                                    {speakerActive && <span class="text-[9px] font-bold text-shieldGreen flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-shieldGreen animate-ping"></span> LIVE CAPTURE</span>}
+                                                </div>
+                                                <canvas 
+                                                    ref={speakerCanvasRef} 
+                                                    width="300" 
+                                                    height="80" 
+                                                    class="w-full bg-slate-900/40 rounded-lg border border-darkBorder/40"
+                                                ></canvas>
+                                                {speechSupportError && (
+                                                    <div class="text-[10px] text-shieldOrange font-semibold leading-normal">
+                                                        ⚠️ {speechSupportError}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Micro-Controller Controls */}
+                                            <div class="md:col-span-6 flex flex-col gap-2.5">
+                                                <div class="flex gap-2">
+                                                    {!speakerActive ? (
+                                                        <button 
+                                                            onClick={startSpeakerListening}
+                                                            class="flex-1 py-2.5 bg-shieldBlue hover:bg-shieldBlue/80 text-darkBg font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-glowBlue transition-all"
+                                                        >
+                                                            🎙️ Start Listening
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={stopSpeakerListening}
+                                                            class="flex-1 py-2.5 bg-shieldRed hover:bg-shieldRed/80 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-glowRed transition-all"
+                                                        >
+                                                            🛑 Stop Listening
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <div class="border-t border-darkBorder/60 my-1"></div>
+
+                                                {/* Scenario simulations */}
+                                                <div>
+                                                    <div class="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Simulate Scenario Dialogue</div>
+                                                    <div class="grid grid-cols-3 gap-1.5">
+                                                        <button 
+                                                            onClick={() => startSimulatedSpeakerCall('bank_otp')}
+                                                            disabled={isSimulatingSpeaker}
+                                                            class="py-1.5 bg-slate-900 hover:bg-slate-800 border border-darkBorder text-[9px] font-bold rounded-lg text-slate-300 transition-all text-center"
+                                                        >
+                                                            🏦 Bank OTP
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => startSimulatedSpeakerCall('voice_clone')}
+                                                            disabled={isSimulatingSpeaker}
+                                                            class="py-1.5 bg-slate-900 hover:bg-slate-805 border border-darkBorder text-[9px] font-bold rounded-lg text-slate-300 transition-all text-center"
+                                                        >
+                                                            👨‍👦 Voice Clone
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => startSimulatedSpeakerCall('delivery')}
+                                                            disabled={isSimulatingSpeaker}
+                                                            class="py-1.5 bg-slate-900 hover:bg-slate-800 border border-darkBorder text-[9px] font-bold rounded-lg text-slate-300 transition-all text-center"
+                                                        >
+                                                            📦 Safe Delivery
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Instruction Card */}
+                                        {speakerInstructionVisible && (
+                                            <div class="p-3 bg-shieldBlue/5 border border-shieldBlue/20 rounded-xl flex gap-3 items-center animate-fade-in">
+                                                <span class="text-xl">📢</span>
+                                                <div>
+                                                    <div class="text-[11px] font-bold text-white">Speaker Mode Active</div>
+                                                    <p class="text-[10px] text-slate-400 mt-0.5 leading-normal">
+                                                        "Put the phone call on Speaker Mode and keep this app running. The microphone will capture the caller's voice for analysis."
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Telemetry Status & Badges Panel */}
+                                        <div class="grid grid-cols-1 md:grid-cols-12 gap-4 border-t border-darkBorder/60 pt-4">
+                                            {/* Live Call Status Tracker */}
+                                            <div class="md:col-span-5 bg-slate-950/80 border border-darkBorder/55 rounded-xl p-3 flex flex-col gap-1.5">
+                                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Live Call Telemetry Status</span>
+                                                <div class="flex flex-col gap-1 font-mono text-[9px]">
+                                                    {[
+                                                        "📞 Unknown Caller Detected",
+                                                        "Monitoring Started",
+                                                        "Microphone Active",
+                                                        "AI Shield Enabled",
+                                                        "Transcript Received",
+                                                        "Risk Score Updated",
+                                                        "Scam Warning Generated"
+                                                    ].map((step, idx) => {
+                                                        const isCompleted = speakerTelemetrySteps.includes(step);
+                                                        if (step === "Scam Warning Generated" && speakerScore < 70) return null;
+                                                        return (
+                                                            <div key={idx} class="flex items-center gap-1.5">
+                                                                <span class={isCompleted ? 'text-shieldGreen font-bold' : 'text-slate-700'}>
+                                                                    {isCompleted ? '✓' : '○'}
+                                                                </span>
+                                                                <span class={isCompleted ? 'text-slate-300' : 'text-slate-600'}>
+                                                                    {step}
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+
+                                            {/* Badges Grid */}
+                                            <div class="md:col-span-7 flex flex-col gap-2">
+                                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Acoustic Indicators & Badges</span>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    <span class="px-2 py-1 rounded bg-slate-900 border border-darkBorder text-[9px] font-bold text-slate-300">
+                                                        📞 Unknown Caller
+                                                    </span>
+                                                    {speakerBadges.otpRequest && (
+                                                        <span class="px-2 py-1 rounded bg-shieldRed/15 border border-shieldRed/30 text-[9px] font-bold text-shieldRed animate-pulse">
+                                                            🔑 OTP Request
+                                                        </span>
+                                                    )}
+                                                    {speakerBadges.moneyTransfer && (
+                                                        <span class="px-2 py-1 rounded bg-shieldRed/15 border border-shieldRed/30 text-[9px] font-bold text-shieldRed animate-pulse">
+                                                            💸 Money Transfer Request
+                                                        </span>
+                                                    )}
+                                                    {speakerBadges.urgencyDetected && (
+                                                        <span class="px-2 py-1 rounded bg-shieldOrange/10 border border-shieldOrange/40 text-[9px] font-bold text-shieldOrange">
+                                                            🚨 Urgency Detected
+                                                        </span>
+                                                    )}
+                                                    {speakerBadges.possibleSyntheticSpeech && (
+                                                        <span class="px-2 py-1 rounded bg-shieldRed/15 border border-shieldRed/30 text-[9px] font-bold text-shieldRed animate-pulse">
+                                                            🗣️ Possible Synthetic Speech
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Rolling Transcript Panel */}
+                                                <div class="mt-1">
+                                                    <div class="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Live Capture Transcript</div>
+                                                    <div class="bg-slate-950 border border-darkBorder rounded-lg p-2.5 min-h-[50px] max-h-[80px] overflow-y-auto text-xs text-slate-300 leading-normal font-mono select-all font-semibold">
+                                                        {speakerTranscript || <span class="text-slate-600 italic font-normal">No audio captured yet. Start speaking or click simulation...</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Dynamic Risk Rating Alert & Mitigation Advice */}
+                                        {speakerTranscript && (
+                                            <div class="border-t border-darkBorder/60 pt-4 flex flex-col gap-3">
+                                                <div class="flex justify-between items-center bg-slate-950 border border-darkBorder p-3 rounded-xl">
+                                                    <div>
+                                                        <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Acoustic Score Engine</span>
+                                                        <h4 class="text-xs font-bold text-white mt-0.5">Weighted Threat Ensemble Risk</h4>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <span class={`text-lg font-black font-mono ${speakerScore >= 70 ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'}`}>
+                                                            {speakerScore}%
+                                                        </span>
+                                                        <span class={`text-[8px] font-bold block uppercase tracking-widest ${speakerScore >= 70 ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'}`}>
+                                                            {speakerRiskLevel}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Red Scam Alert Card */}
+                                                {speakerScore >= 70 && (
+                                                    <div class="p-4 bg-shieldRed/10 border-2 border-shieldRed/30 rounded-xl flex flex-col gap-3 animate-fade-in">
+                                                        <div class="flex items-start gap-2.5">
+                                                            <span class="text-xl">🚨</span>
+                                                            <div>
+                                                                <h4 class="text-xs font-black text-white uppercase tracking-wider">Possible Scam Call Detected</h4>
+                                                                <p class="text-[10px] text-slate-400 mt-1 font-medium leading-normal">
+                                                                    ⚠️ <strong>Mitigation Advice:</strong> High risk of AI voice cloning or active extortion. Do NOT share OTP credentials, verify verification links, or transfer money.
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex justify-end gap-2 mt-1">
+                                                            <button 
+                                                                onClick={stopSpeakerListening}
+                                                                class="px-3 py-1.5 bg-shieldRed hover:bg-shieldRed/80 text-white rounded-lg text-[10px] font-black transition-all cursor-pointer border-none"
+                                                            >
+                                                                📞 Hang Up Recommended
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setSpeakerScore(5);
+                                                                    setSpeakerRiskLevel('SAFE');
+                                                                    setSpeakerBadges(prev => ({ ...prev, otpRequest: false, moneyTransfer: false, urgencyDetected: false, possibleSyntheticSpeech: false }));
+                                                                }}
+                                                                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold transition-all cursor-pointer border-none"
+                                                            >
+                                                                Mark Safe
+                                                            </button>
+                                                            <button 
+                                                                onClick={handleSaveSpeakerIncident}
+                                                                class="px-3 py-1.5 bg-shieldBlue hover:bg-shieldBlue/80 text-darkBg rounded-lg text-[10px] font-bold transition-all cursor-pointer border-none font-extrabold"
+                                                            >
+                                                                Save Incident
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Prototype Disclaimer Notice */}
+                                        <div class="border-t border-darkBorder/40 pt-3 mt-1.5 text-[9px] text-slate-500 leading-normal flex items-start gap-2">
+                                            <span class="text-xs">⚠️</span>
+                                            <p>
+                                                <strong>Prototype Notice:</strong> Due to Android and iOS privacy restrictions, third-party applications cannot directly access native cellular call audio. This prototype demonstrates a practical speaker-assisted monitoring approach where the phone microphone captures speaker output for real-time AI scam analysis.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    )}
+
+                                    {/* AI CALL INTEGRITY MONITOR */}
                                     <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden">
                                         <div class="absolute inset-0 bg-gradient-to-r from-shieldBlue/5 to-transparent pointer-events-none"></div>
                                         <div class="flex items-center justify-between">
@@ -1375,9 +2300,12 @@
                                                 ))}
                                             </div>
                                         </div>
-
                                     </div>
-                                </div>
+                                </div> 
+                                            
+                                        
+                                    
+                                
 
                                 {/* Dashboard Right: Stats, Recent Logs, Info */}
                                 <div class="md:col-span-4 flex flex-col gap-6">
@@ -1453,6 +2381,584 @@
                             </div>
                         );
                     })()}
+
+                    {/* SCREEN 1.5: SPEAKER SHIELD PROTOTYPE */}
+                    {activeScreen === 'speaker' && (
+                        <div class="max-w-7xl mx-auto w-full flex flex-col gap-6 animate-fade-in">
+                            {/* Premium Header */}
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/40 border border-darkBorder/40 p-5 rounded-2xl">
+                                <div>
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-shieldBlue animate-pulse shadow-glowBlue"></span>
+                                        <h2 class="text-lg font-black tracking-wider text-slate-100 uppercase">Speaker Shield™ SOC</h2>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-1">
+                                        Real-time speaker-mode microphone acoustic capture, NLP transcription, and synthetic deepfake detection.
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-[10px] px-2.5 py-1 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg font-mono">
+                                        RESTRICTION: SANDBOX MIC CAPTURE
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Dual Column Layout */}
+                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                
+                                {/* LEFT SIDE: Real-Time Call Monitoring Center (Col span 7) */}
+                                <div class="lg:col-span-7 flex flex-col gap-6">
+                                    
+                                    {/* 1. Incoming Call Card */}
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden border border-slate-800/80">
+                                        {/* Status glow border */}
+                                        <div class={`absolute top-0 left-0 right-0 h-1 transition-colors duration-500 ${
+                                            speakerActive 
+                                                ? (speakerScore >= 70 ? 'bg-shieldRed shadow-glowRed' : speakerScore >= 40 ? 'bg-shieldOrange shadow-glowOrange' : 'bg-shieldGreen shadow-glowGreen')
+                                                : 'bg-slate-800'
+                                        }`}></div>
+
+                                        <div class="flex justify-between items-start">
+                                            <div class="flex items-center gap-3">
+                                                {/* Pulsing Phone Circle */}
+                                                <div class={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                                                    speakerActive 
+                                                        ? (speakerScore >= 70 ? 'bg-shieldRed/10 text-shieldRed animate-pulse shadow-glowRed' : 'bg-shieldBlue/10 text-shieldBlue animate-pulse shadow-glowBlue')
+                                                        : 'bg-slate-900 text-slate-500'
+                                                }`}>
+                                                    <Icon name="phone" className="w-6 h-6" />
+                                                </div>
+                                                <div>
+                                                    <span class="text-[9px] font-black uppercase tracking-wider text-slate-400">Incoming Call</span>
+                                                    <h3 class="text-sm font-bold text-white mt-0.5 font-mono">
+                                                        {currentSpeakerScenario === 'voice_clone' ? '+91 70192 38491' : '+91 90123 45678'}
+                                                    </h3>
+                                                    <span class="text-[10px] text-slate-500 font-medium block">
+                                                        {currentSpeakerScenario === 'voice_clone' ? 'Potential AI Voice Clone' : 'Unknown Number'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-[9px] font-bold text-slate-500 uppercase block tracking-wider">Duration</span>
+                                                <span class="text-xs font-mono font-bold text-slate-200 mt-1 block">
+                                                    {Math.floor(speakerDuration / 60).toString().padStart(2, '0')}:{(speakerDuration % 60).toString().padStart(2, '0')}
+                                                </span>
+                                                <span class={`text-[9px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 font-mono uppercase ${
+                                                    speakerActive ? 'bg-shieldGreen/15 text-shieldGreen animate-pulse' : 'bg-slate-800 text-slate-400'
+                                                }`}>
+                                                    {speakerActive ? 'Listening...' : 'Idle'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Microphone capture disclaimer */}
+                                        <div class="p-3 bg-slate-900/60 border border-darkBorder/40 rounded-xl flex items-start gap-2.5">
+                                            <span class="text-xs mt-0.5 text-shieldBlue">💡</span>
+                                            <p class="text-[10px] text-slate-400 leading-relaxed font-medium">
+                                                <strong>Mobile OS Restrictions:</strong> Third-party apps cannot access call audio streams. Put call on <strong>Speaker Mode</strong> next to this mic to activate protection.
+                                            </p>
+                                        </div>
+
+                                        {/* Waveform Visualization */}
+                                        <div class="flex flex-col gap-2 bg-slate-950/80 border border-darkBorder/40 rounded-xl p-3">
+                                            <div class="flex justify-between items-center text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                                <span>Acoustic Waveform Telemetry</span>
+                                                {speakerActive && <span class="text-shieldGreen animate-pulse">MIC ACTIVE</span>}
+                                            </div>
+                                            <canvas 
+                                                ref={speakerCanvasRef} 
+                                                width="400" 
+                                                height="60" 
+                                                class="w-full bg-slate-900/20 rounded border border-darkBorder/20"
+                                            ></canvas>
+                                            {speechSupportError && (
+                                                <span class="text-[9px] text-shieldOrange font-mono">{speechSupportError}</span>
+                                            )}
+                                        </div>
+
+                                        {/* Control buttons */}
+                                        <div class="flex flex-col md:flex-row gap-3 pt-2">
+                                            {!speakerActive ? (
+                                                <button 
+                                                    onClick={startSpeakerListening}
+                                                    class="flex-1 py-2.5 bg-shieldBlue hover:bg-shieldBlue/80 text-darkBg font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-glowBlue transition-all"
+                                                >
+                                                    🎙️ Start Speaker Protection
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={stopSpeakerListening}
+                                                    class="flex-1 py-2.5 bg-shieldRed hover:bg-shieldRed/80 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-glowRed transition-all"
+                                                >
+                                                    🛑 Terminate Monitoring
+                                                </button>
+                                            )}
+                                            
+                                            <div class="flex gap-1.5 flex-wrap md:flex-nowrap">
+                                                <button 
+                                                    onClick={() => startSimulatedSpeakerCall('bank_otp')}
+                                                    disabled={isSimulatingSpeaker}
+                                                    class="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-40 text-[10px] font-bold rounded-xl text-slate-300 transition-all text-center flex-1"
+                                                >
+                                                    🏦 Bank OTP Sim
+                                                </button>
+                                                <button 
+                                                    onClick={() => startSimulatedSpeakerCall('voice_clone')}
+                                                    disabled={isSimulatingSpeaker}
+                                                    class="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-40 text-[10px] font-bold rounded-xl text-slate-300 transition-all text-center flex-1"
+                                                >
+                                                    👨‍👦 Voice Clone Sim
+                                                </button>
+                                                <button 
+                                                    onClick={() => startSimulatedSpeakerCall('delivery')}
+                                                    disabled={isSimulatingSpeaker}
+                                                    class="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 disabled:opacity-40 text-[10px] font-bold rounded-xl text-slate-300 transition-all text-center flex-1"
+                                                >
+                                                    📦 Safe Delivery Sim
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 2. Real-Time Scam Timeline & Call Transcript (bubbles) */}
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 border border-slate-800/80">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-xs font-black uppercase text-slate-400 tracking-wider">Live Call Transcript & NLP Stream</span>
+                                            {speakerActive && <span class="text-[9px] px-2 py-0.5 bg-shieldBlue/10 text-shieldBlue rounded border border-shieldBlue/20 font-mono animate-pulse">DECRYPTING...</span>}
+                                        </div>
+
+                                        <div class="flex flex-col gap-3 min-h-[160px] max-h-[220px] overflow-y-auto bg-slate-950/90 border border-darkBorder/60 rounded-xl p-4">
+                                            {speakerChatBubbles.length === 0 ? (
+                                                <div class="h-full flex flex-col items-center justify-center text-center text-slate-500 py-8">
+                                                    <span class="text-xl">🎙️</span>
+                                                    <p class="text-xs mt-2 font-medium">No audio transcribed yet. Say something or click simulation scenario buttons above.</p>
+                                                </div>
+                                            ) : (
+                                                speakerChatBubbles.map((bubble, i) => (
+                                                    <div 
+                                                        key={i} 
+                                                        class={`flex ${bubble.sender === 'ai' ? 'justify-start' : 'justify-end'} animate-fade-in`}
+                                                    >
+                                                        <div class={`max-w-[85%] rounded-xl p-3 text-xs leading-relaxed ${
+                                                            bubble.sender === 'ai' 
+                                                                ? 'bg-slate-900 border border-shieldBlue/30 text-shieldBlue font-semibold font-mono text-[10px]' 
+                                                                : 'bg-shieldBlue/10 border border-shieldBlue/20 text-slate-200'
+                                                        }`}>
+                                                            {bubble.sender === 'ai' && <span class="font-black text-shieldBlue block mb-0.5">🤖 SHIELD AI INTENT ANALYSIS:</span>}
+                                                            {bubble.text}
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        {/* Fallback complete transcript */}
+                                        {speakerTranscript && (
+                                            <div class="flex flex-col gap-1.5 mt-2 bg-slate-950 p-3 rounded-lg border border-darkBorder/30">
+                                                <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">Accumulated Raw Stream</span>
+                                                <p class="text-[11px] font-mono text-slate-400 font-semibold">{speakerTranscript}</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                </div>
+
+                                {/* RIGHT SIDE: Threat Intelligence Center (Col span 5) */}
+                                <div class="lg:col-span-5 flex flex-col gap-6">
+                                    
+                                    {/* 1. Live AI Risk Meter */}
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 border border-slate-800/80">
+                                        <span class="text-xs font-black uppercase text-slate-400 tracking-wider">Scam Risk Classifier</span>
+                                        
+                                        <div class="flex justify-between items-center bg-slate-950 border border-darkBorder/40 p-4 rounded-xl">
+                                            <div>
+                                                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider block font-black">Risk Status</span>
+                                                <span class={`text-sm font-black uppercase tracking-wider ${
+                                                    speakerScore >= 70 ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'
+                                                }`}>
+                                                    {speakerRiskLevel}
+                                                </span>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider block font-black">AI Score</span>
+                                                <span class={`text-2xl font-black font-mono tracking-tighter ${
+                                                    speakerScore >= 70 ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'
+                                                }`}>
+                                                    {speakerScore}%
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Score Bar */}
+                                        <div class="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-900">
+                                            <div 
+                                                class={`h-full transition-all duration-300 ${
+                                                    speakerScore >= 70 ? 'bg-shieldRed' : speakerScore >= 40 ? 'bg-shieldOrange' : 'bg-shieldGreen'
+                                                }`}
+                                                style={{ width: `${speakerScore}%` }}
+                                            ></div>
+                                        </div>
+
+                                        {/* Threat alert mitigations */}
+                                        {speakerScore >= 70 ? (
+                                            <div class="p-3 bg-shieldRed/10 border border-shieldRed/30 rounded-xl flex flex-col gap-2.5 animate-pulse">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-lg">🚨</span>
+                                                    <span class="text-xs font-black text-shieldRed uppercase tracking-wider">CRITICAL THREAT FLAG</span>
+                                                </div>
+                                                <p class="text-[10px] text-slate-400 leading-relaxed font-semibold">
+                                                    <strong>Recommendation:</strong> Hang up immediately. Caller matches impersonation threat patterns.
+                                                </p>
+                                                <div class="flex gap-2 justify-end mt-1">
+                                                    <button onClick={stopSpeakerListening} class="px-3 py-1.5 bg-shieldRed hover:bg-shieldRed/80 text-white text-[10px] font-extrabold rounded-lg border-none transition-all cursor-pointer">
+                                                        Hang Up Call
+                                                    </button>
+                                                    <button onClick={handleSaveSpeakerIncident} class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg border-none transition-all cursor-pointer">
+                                                        Log Incident
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div class="p-3 bg-slate-900/60 border border-darkBorder/40 rounded-xl flex items-center gap-2">
+                                                <span class="text-base text-shieldGreen">🛡️</span>
+                                                <span class="text-[10px] text-slate-400 font-medium font-semibold">Acoustic Shield status normal. Listening for risk triggers...</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* 2. Threat Reasons & Acoustic Indicators */}
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 border border-slate-800/80">
+                                        <span class="text-xs font-black uppercase text-slate-400 tracking-wider">Acoustic Indicators & Threat Flags</span>
+                                        
+                                        <div class="flex flex-wrap gap-2">
+                                            <span class="px-2.5 py-1 bg-slate-950 border border-slate-900 text-slate-400 text-[9px] font-bold rounded-lg flex items-center gap-1.5">
+                                                📞 Caller: Unknown
+                                            </span>
+                                            {speakerBadges.possibleSyntheticSpeech ? (
+                                                <span class="px-2.5 py-1 bg-shieldRed/10 border border-shieldRed/30 text-shieldRed text-[9px] font-black rounded-lg flex items-center gap-1.5 animate-pulse">
+                                                    🗣️ Cloned Voice Signature
+                                                </span>
+                                            ) : (
+                                                <span class="px-2.5 py-1 bg-slate-950 border border-slate-900 text-slate-500 text-[9px] font-bold rounded-lg flex items-center gap-1.5">
+                                                    🗣️ Voice: Normal Profile
+                                                </span>
+                                            )}
+                                            {speakerBadges.otpRequest && (
+                                                <span class="px-2.5 py-1 bg-shieldRed/10 border border-shieldRed/30 text-shieldRed text-[9px] font-black rounded-lg flex items-center gap-1.5 animate-pulse">
+                                                    🔑 Credential Extortion
+                                                </span>
+                                            )}
+                                            {speakerBadges.moneyTransfer && (
+                                                <span class="px-2.5 py-1 bg-shieldRed/10 border border-shieldRed/30 text-shieldRed text-[9px] font-black rounded-lg flex items-center gap-1.5 animate-pulse">
+                                                    💸 Fund Transfer Request
+                                                </span>
+                                            )}
+                                            {speakerBadges.urgencyDetected && (
+                                                <span class="px-2.5 py-1 bg-shieldOrange/10 border border-shieldOrange/30 text-shieldOrange text-[9px] font-black rounded-lg flex items-center gap-1.5">
+                                                    🚨 Coercion/Urgency Triggers
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* AI Detection Pipeline Stage Visualization */}
+                                        <div class="flex flex-col gap-2 mt-2">
+                                            <span class="text-[9px] font-black uppercase text-slate-500 tracking-wider">Acoustic Shield Pipeline Status</span>
+                                            <div class="grid grid-cols-6 gap-1 font-mono text-[8px] text-center">
+                                                {[
+                                                    { step: 1, label: 'Audio Recv', desc: 'Call connection' },
+                                                    { step: 2, label: 'Mic Setup', desc: 'Local capture active' },
+                                                    { step: 3, label: 'NLP STT', desc: 'Transcription' },
+                                                    { step: 4, label: 'Deepfake Check', desc: 'Biometric acoustics' },
+                                                    { step: 5, label: 'Risk Score', desc: 'Weighted Ensemble' },
+                                                    { step: 6, label: 'Shield Alert', desc: 'Advisory push' }
+                                                ].map((pStep) => {
+                                                    const isActive = speakerSimulationStep === pStep.step;
+                                                    const isCompleted = speakerSimulationStep > pStep.step;
+                                                    return (
+                                                        <div 
+                                                            key={pStep.step}
+                                                            class={`p-1.5 border rounded-lg transition-all flex flex-col gap-0.5 justify-center ${
+                                                                isActive 
+                                                                    ? 'bg-shieldBlue/15 border-shieldBlue text-shieldBlue font-bold scale-105 shadow-glowBlue'
+                                                                    : isCompleted 
+                                                                        ? 'bg-shieldGreen/5 border-shieldGreen/30 text-shieldGreen'
+                                                                        : 'bg-slate-950 border-slate-900 text-slate-600'
+                                                            }`}
+                                                        >
+                                                            <span class="font-black">#{pStep.step}</span>
+                                                            <span class="uppercase font-semibold tracking-tighter truncate">{pStep.label}</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 3. Security Statistics Panel */}
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 border border-slate-800/80">
+                                        <span class="text-xs font-black uppercase text-slate-400 tracking-wider">Global Threat Intelligence logs</span>
+                                        
+                                        <div class="grid grid-cols-3 gap-2">
+                                            <div class="bg-slate-950 border border-darkBorder/40 p-3 rounded-xl text-center">
+                                                <span class="text-[9px] text-slate-500 font-bold block mb-1">Calls Protected</span>
+                                                <span class="text-lg font-black text-slate-100">142</span>
+                                            </div>
+                                            <div class="bg-slate-950 border border-darkBorder/40 p-3 rounded-xl text-center">
+                                                <span class="text-[9px] text-slate-500 font-bold block mb-1">Scams Blocked</span>
+                                                <span class="text-lg font-black text-shieldOrange">29</span>
+                                            </div>
+                                            <div class="bg-slate-950 border border-darkBorder/40 p-3 rounded-xl text-center">
+                                                <span class="text-[9px] text-slate-500 font-bold block mb-1">Deepfakes Intercepted</span>
+                                                <span class="text-lg font-black text-shieldRed">14</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        </div>
+                    )}
+                    { false && (
+                        <div class="max-w-4xl mx-auto w-full flex flex-col gap-6">
+                            <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden border border-shieldBlue/25 shadow-glowBlue">
+                                <div class="absolute inset-0 bg-gradient-to-r from-shieldBlue/5 to-transparent pointer-events-none"></div>
+                                <div class="flex items-center justify-between">
+                                    <h2 class="text-md font-extrabold text-slate-200 tracking-wider flex items-center gap-2">
+                                        <span>📞 SPEAKER MODE DEMO (REAL-WORLD PROTOTYPE)</span>
+                                        <span class="text-[9px] px-2 py-0.5 bg-shieldBlue/15 text-shieldBlue rounded-full font-mono font-bold animate-pulse">MIC ACTIVE LAYER</span>
+                                    </h2>
+                                </div>
+
+                                <p class="text-xs text-slate-400 leading-normal">
+                                    Since third-party applications cannot directly capture native call audio due to mobile OS sandbox restrictions, this module uses microphone-based acquisition. Put your phone call on speaker mode next to this device.
+                                </p>
+
+                                {/* Waveform & Control Panel */}
+                                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                                    {/* Waveform Canvas */}
+                                    <div class="md:col-span-6 bg-slate-950 border border-darkBorder rounded-xl p-3 flex flex-col gap-2 relative">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Acoustic Telemetry Waveform</span>
+                                            {speakerActive && <span class="text-[9px] font-bold text-shieldGreen flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-shieldGreen animate-ping"></span> LIVE CAPTURE</span>}
+                                        </div>
+                                        <canvas 
+                                            ref={null} 
+                                            width="300" 
+                                            height="80" 
+                                            class="w-full bg-slate-900/40 rounded-lg border border-darkBorder/40"
+                                        ></canvas>
+                                        {speechSupportError && (
+                                            <div class="text-[10px] text-shieldOrange font-semibold leading-normal">
+                                                ⚠️ {speechSupportError}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Micro-Controller Controls */}
+                                    <div class="md:col-span-6 flex flex-col gap-2.5">
+                                        <div class="flex gap-2">
+                                            {!speakerActive ? (
+                                                <button 
+                                                    onClick={startSpeakerListening}
+                                                    class="flex-1 py-2.5 bg-shieldBlue hover:bg-shieldBlue/80 text-darkBg font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-glowBlue transition-all"
+                                                >
+                                                    🎙️ Start Listening
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={stopSpeakerListening}
+                                                    class="flex-1 py-2.5 bg-shieldRed hover:bg-shieldRed/80 text-white font-black rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-glowRed transition-all"
+                                                >
+                                                    🛑 Stop Listening
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        <div class="border-t border-darkBorder/60 my-1"></div>
+
+                                        {/* Scenario simulations */}
+                                        <div>
+                                            <div class="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Simulate Scenario Dialogue</div>
+                                            <div class="grid grid-cols-3 gap-1.5">
+                                                <button 
+                                                    onClick={() => startSimulatedSpeakerCall('bank_otp')}
+                                                    disabled={isSimulatingSpeaker}
+                                                    class="py-1.5 bg-slate-900 hover:bg-slate-800 border border-darkBorder text-[9px] font-bold rounded-lg text-slate-300 transition-all text-center"
+                                                >
+                                                    🏦 Bank OTP
+                                                </button>
+                                                <button 
+                                                    onClick={() => startSimulatedSpeakerCall('voice_clone')}
+                                                    disabled={isSimulatingSpeaker}
+                                                    class="py-1.5 bg-slate-900 hover:bg-slate-800 border border-darkBorder text-[9px] font-bold rounded-lg text-slate-300 transition-all text-center"
+                                                >
+                                                    👨‍👦 Voice Clone
+                                                </button>
+                                                <button 
+                                                    onClick={() => startSimulatedSpeakerCall('delivery')}
+                                                    disabled={isSimulatingSpeaker}
+                                                    class="py-1.5 bg-slate-900 hover:bg-slate-800 border border-darkBorder text-[9px] font-bold rounded-lg text-slate-300 transition-all text-center"
+                                                >
+                                                    📦 Safe Delivery
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Instruction Card */}
+                                {speakerInstructionVisible && (
+                                    <div class="p-3 bg-shieldBlue/5 border border-shieldBlue/20 rounded-xl flex gap-3 items-center animate-fade-in">
+                                        <span class="text-xl">📢</span>
+                                        <div>
+                                            <div class="text-[11px] font-bold text-white">Speaker Mode Active</div>
+                                            <p class="text-[10px] text-slate-400 mt-0.5 leading-normal">
+                                                "Put the phone call on Speaker Mode and keep this app running. The microphone will capture the caller's voice for analysis."
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Telemetry Status & Badges Panel */}
+                                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 border-t border-darkBorder/60 pt-4">
+                                    {/* Live Call Status Tracker */}
+                                    <div class="md:col-span-5 bg-slate-950/80 border border-darkBorder/55 rounded-xl p-3 flex flex-col gap-1.5">
+                                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Live Call Telemetry Status</span>
+                                        <div class="flex flex-col gap-1 font-mono text-[9px]">
+                                            {[
+                                                "📞 Unknown Caller Detected",
+                                                "Monitoring Started",
+                                                "Microphone Active",
+                                                "AI Shield Enabled",
+                                                "Transcript Received",
+                                                "Risk Score Updated",
+                                                "Scam Warning Generated"
+                                            ].map((step, idx) => {
+                                                const isCompleted = speakerTelemetrySteps.includes(step);
+                                                if (step === "Scam Warning Generated" && speakerScore < 70) return null;
+                                                return (
+                                                    <div key={idx} class="flex items-center gap-1.5">
+                                                        <span class={isCompleted ? 'text-shieldGreen font-bold' : 'text-slate-700'}>
+                                                            {isCompleted ? '✓' : '○'}
+                                                        </span>
+                                                        <span class={isCompleted ? 'text-slate-300' : 'text-slate-600'}>
+                                                            {step}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Badges Grid */}
+                                    <div class="md:col-span-7 flex flex-col gap-2">
+                                        <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">Acoustic Indicators & Badges</span>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <span class="px-2 py-1 rounded bg-slate-900 border border-darkBorder text-[9px] font-bold text-slate-300">
+                                                📞 Unknown Caller
+                                            </span>
+                                            {speakerBadges.otpRequest && (
+                                                <span class="px-2 py-1 rounded bg-shieldRed/15 border border-shieldRed/30 text-[9px] font-bold text-shieldRed animate-pulse">
+                                                    🔑 OTP Request
+                                                </span>
+                                            )}
+                                            {speakerBadges.moneyTransfer && (
+                                                <span class="px-2 py-1 rounded bg-shieldRed/15 border border-shieldRed/30 text-[9px] font-bold text-shieldRed animate-pulse">
+                                                    💸 Money Transfer Request
+                                                </span>
+                                            )}
+                                            {speakerBadges.urgencyDetected && (
+                                                <span class="px-2 py-1 rounded bg-shieldOrange/10 border border-shieldOrange/40 text-[9px] font-bold text-shieldOrange">
+                                                    🚨 Urgency Detected
+                                                </span>
+                                            )}
+                                            {speakerBadges.possibleSyntheticSpeech && (
+                                                <span class="px-2 py-1 rounded bg-shieldRed/15 border border-shieldRed/30 text-[9px] font-bold text-shieldRed animate-pulse">
+                                                    🗣️ Possible Synthetic Speech
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Rolling Transcript Panel */}
+                                        <div class="mt-1">
+                                            <div class="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Live Capture Transcript</div>
+                                            <div class="bg-slate-950 border border-darkBorder rounded-lg p-2.5 min-h-[50px] max-h-[80px] overflow-y-auto text-xs text-slate-300 leading-normal font-mono select-all font-semibold">
+                                                {speakerTranscript || <span class="text-slate-600 italic font-normal">No audio captured yet. Start speaking or click simulation...</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Dynamic Risk Rating Alert & Mitigation Advice */}
+                                {speakerTranscript && (
+                                    <div class="border-t border-darkBorder/60 pt-4 flex flex-col gap-3">
+                                        <div class="flex justify-between items-center bg-slate-950 border border-darkBorder p-3 rounded-xl">
+                                            <div>
+                                                <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Acoustic Score Engine</span>
+                                                <h4 class="text-xs font-bold text-white mt-0.5">Weighted Threat Ensemble Risk</h4>
+                                            </div>
+                                            <div class="text-right">
+                                                <span class={`text-lg font-black font-mono ${speakerScore >= 70 ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'}`}>
+                                                    {speakerScore}%
+                                                </span>
+                                                <span class={`text-[8px] font-bold block uppercase tracking-widest ${speakerScore >= 70 ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'}`}>
+                                                    {speakerRiskLevel}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Red Scam Alert Card */}
+                                        {speakerScore >= 70 && (
+                                            <div class="p-4 bg-shieldRed/10 border-2 border-shieldRed/30 rounded-xl flex flex-col gap-3 animate-fade-in">
+                                                <div class="flex items-start gap-2.5">
+                                                    <span class="text-xl">🚨</span>
+                                                    <div>
+                                                        <h4 class="text-xs font-black text-white uppercase tracking-wider">Possible Scam Call Detected</h4>
+                                                        <p class="text-[10px] text-slate-400 mt-1 font-medium leading-normal">
+                                                            ⚠️ <strong>Mitigation Advice:</strong> High risk of AI voice cloning or active extortion. Do NOT share OTP credentials, verify verification links, or transfer money.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex justify-end gap-2 mt-1">
+                                                    <button 
+                                                        onClick={stopSpeakerListening}
+                                                        class="px-3 py-1.5 bg-shieldRed hover:bg-shieldRed/80 text-white rounded-lg text-[10px] font-black transition-all cursor-pointer border-none"
+                                                    >
+                                                        📞 Hang Up Recommended
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            setSpeakerScore(5);
+                                                            setSpeakerRiskLevel('SAFE');
+                                                            setSpeakerBadges(prev => ({ ...prev, otpRequest: false, moneyTransfer: false, urgencyDetected: false, possibleSyntheticSpeech: false }));
+                                                        }}
+                                                        class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] font-bold transition-all cursor-pointer border-none"
+                                                    >
+                                                        Mark Safe
+                                                    </button>
+                                                    <button 
+                                                        onClick={handleSaveSpeakerIncident}
+                                                        class="px-3 py-1.5 bg-shieldBlue hover:bg-shieldBlue/80 text-darkBg rounded-lg text-[10px] font-bold transition-all cursor-pointer border-none font-extrabold"
+                                                    >
+                                                        Save Incident
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Prototype Disclaimer Notice */}
+                                <div class="border-t border-darkBorder/40 pt-3 mt-1.5 text-[9px] text-slate-500 leading-normal flex items-start gap-2">
+                                    <span class="text-xs">⚠️</span>
+                                    <p>
+                                        <strong>Prototype Notice:</strong> Due to Android and iOS privacy restrictions, third-party applications cannot directly access native cellular call audio. This prototype demonstrates a practical speaker-assisted monitoring approach where the phone microphone captures speaker output for real-time AI scam analysis.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* SCREEN 2, 3, 4: REALISTIC MOBILE EXPERIENCE SIMULATOR */}
                     {activeScreen === 'live' && (
@@ -1883,9 +3389,38 @@
                         </div>
                     )}
 
+                    {/* SCREEN: TRUSTED PROFILES MODULE */}
                     {activeScreen === 'profiles' && (
-                        /* Voice Vault Enrollment Form */
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start mt-2">
+                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4">
+                            <div class="flex justify-between items-center border-b border-darkBorder pb-3">
+                                <h2 class="text-md font-extrabold text-white tracking-wider flex items-center gap-2">
+                                    <Icon name="users" className="w-5 h-5 text-shieldBlue" />
+                                    TRUSTED PROFILES (SPEAKER IDENTIFICATION)
+                                </h2>
+                                <span class="text-[9px] font-bold px-2 py-0.5 bg-slate-800 text-slate-400 rounded uppercase">Optional Module</span>
+                            </div>
+                            
+                            <div class="p-4 bg-slate-900/50 border border-darkBorder rounded-xl text-xs text-slate-400 leading-relaxed max-w-3xl">
+                                💡 <strong>Acoustic Vault Security Notice:</strong> Trusted Profiles are optional voice identities used *only* for identity verification during impersonation attempts. When a caller claims to be your family member, the system will trigger a voice similarity verification.
+                            </div>
+
+                            {/* Identity verification flow diagram */}
+                            <div class="bg-slate-950 border border-slate-900 rounded-xl p-4 flex flex-col gap-3 font-mono text-[10px] tracking-wide">
+                                <div class="text-center font-bold text-shieldBlue border-b border-slate-900 pb-2 uppercase">Identity Claim Interception Flow</div>
+                                <div class="grid grid-cols-1 md:grid-cols-9 gap-2 items-center text-center">
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-slate-300 font-bold">Identity Claimed</div>
+                                    <div class="text-slate-600">➔</div>
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-slate-300 font-bold">Trusted Profile Match</div>
+                                    <div class="text-slate-600">➔</div>
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-shieldOrange font-bold">Voice Similarity Analysis</div>
+                                    <div class="text-slate-600">➔</div>
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-shieldRed font-bold">Deepfake Detection</div>
+                                    <div class="text-slate-600">➔</div>
+                                    <div class="bg-slate-900 p-2 rounded border border-darkBorder text-shieldGreen font-bold">Impersonation Alert Check</div>
+                                </div>
+                            </div>
+                             {/* Voice Vault Enrollment Form */}
+                             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start mt-2">
                                  
                                  {/* Enrollment form column */}
                                  <div class="md:col-span-1 bg-slate-900/40 border border-darkBorder rounded-xl p-5 flex flex-col gap-4">
@@ -1975,52 +3510,53 @@
                                              </div>
 
                                              {voiceInputMethod === 'upload' ? (
-                                                <div class="flex flex-col gap-2">
-                                                    <label class="w-full bg-slate-950 border border-slate-855 hover:border-slate-700 border-dashed rounded-lg py-2 px-2 text-center text-slate-400 hover:text-slate-300 cursor-pointer block text-[10px] font-semibold truncate transition-all">
-                                                        {selectedFileName ? `📁 ${selectedFileName}` : '📁 Upload WAV/MP3 Voice Sample'}
-                                                        <input 
-                                                            type="file" 
-                                                            accept="audio/*" 
-                                                            class="hidden" 
-                                                            disabled={enrollState === 'loading'} 
-                                                            onChange={(e) => {
-                                                                if(e.target.files && e.target.files[0]) {
-                                                                    const file = e.target.files[0];
-                                                                    setSelectedFileName(file.name);
-                                                                    const url = URL.createObjectURL(file);
-                                                                    setPlaybackUrl(url);
-                                                                    const reader = new FileReader();
-                                                                    reader.readAsDataURL(file);
-                                                                    reader.onloadend = () => {
-                                                                        setCurrentVoiceBase64(reader.result);
-                                                                    };
-                                                                }
-                                                            }}
-                                                        />
-                                                    </label>
-                                                    {playbackUrl && (
-                                                        <div class="flex items-center justify-center gap-2 mt-1">
-                                                            <button 
-                                                                type="button"
-                                                                onClick={togglePlayback}
-                                                                class={`px-2.5 py-1 text-[9px] font-bold rounded-lg transition-all flex items-center gap-1 ${isPlayingBack ? 'bg-shieldOrange/20 border border-shieldOrange/30 text-shieldOrange' : 'bg-shieldGreen/15 border border-shieldGreen/30 text-shieldGreen'}`}
-                                                            >
-                                                                {isPlayingBack ? '⏸ Pause' : '🔊 Play Audio'}
-                                                            </button>
-                                                            <button 
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    setSelectedFileName('');
-                                                                    setPlaybackUrl(null);
-                                                                    setIsPlayingBack(false);
-                                                                }}
-                                                                class="px-2 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[9px] font-bold rounded-lg text-slate-400 hover:text-slate-300 transition-all"
-                                                            >
-                                                                🗑 Reset
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                 <div class="flex flex-col gap-2">
+                                                     <label class="w-full bg-slate-950 border border-slate-855 hover:border-slate-700 border-dashed rounded-lg py-2 px-2 text-center text-slate-400 hover:text-slate-300 cursor-pointer block text-[10px] font-semibold truncate transition-all">
+                                                         {selectedFileName ? `📁 ${selectedFileName}` : '📁 Upload WAV/MP3 Voice Sample'}
+                                                         <input 
+                                                             type="file" 
+                                                             accept="audio/*" 
+                                                             class="hidden" 
+                                                             disabled={enrollState === 'loading'} 
+                                                             onChange={(e) => {
+                                                                 if(e.target.files && e.target.files[0]) {
+                                                                     const file = e.target.files[0];
+                                                                     setSelectedFileName(file.name);
+                                                                     const url = URL.createObjectURL(file);
+                                                                     setPlaybackUrl(url);
+                                                                     
+                                                                     const reader = new FileReader();
+                                                                     reader.readAsDataURL(file);
+                                                                     reader.onloadend = () => {
+                                                                         setCurrentVoiceBase64(reader.result);
+                                                                     };
+                                                                 }
+                                                             }}
+                                                         />
+                                                     </label>
+                                                     {playbackUrl && (
+                                                         <div class="flex items-center justify-center gap-2 mt-1">
+                                                             <button 
+                                                                 type="button"
+                                                                 onClick={togglePlayback}
+                                                                 class={`px-2.5 py-1 text-[9px] font-bold rounded-lg transition-all flex items-center gap-1 ${isPlayingBack ? 'bg-shieldOrange/20 border border-shieldOrange/30 text-shieldOrange' : 'bg-shieldGreen/15 border border-shieldGreen/30 text-shieldGreen'}`}
+                                                             >
+                                                                 {isPlayingBack ? '⏸ Pause' : '🔊 Play Audio'}
+                                                             </button>
+                                                             <button 
+                                                                 type="button"
+                                                                 onClick={() => {
+                                                                     setSelectedFileName('');
+                                                                     setPlaybackUrl(null);
+                                                                     setIsPlayingBack(false);
+                                                                 }}
+                                                                 class="px-2 py-1 bg-slate-900 hover:bg-slate-855 border border-slate-800 text-[9px] font-bold rounded-lg text-slate-400 hover:text-slate-305 transition-all"
+                                                             >
+                                                                 🗑 Reset
+                                                             </button>
+                                                         </div>
+                                                     )}
+                                                 </div>
                                              ) : (
                                                  <div class="bg-slate-950 border border-slate-900 rounded-lg p-2.5 flex flex-col items-center justify-center gap-2 relative overflow-hidden">
                                                      {isRecording ? (
@@ -2076,7 +3612,7 @@
                                                                  <button 
                                                                      type="button"
                                                                      onClick={resetRecording}
-                                                                     class="px-2 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[9px] font-bold rounded-lg text-slate-400 hover:text-slate-355 transition-all"
+                                                                     class="px-2 py-1 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-[9px] font-bold rounded-lg text-slate-405 hover:text-slate-355 transition-all"
                                                                  >
                                                                      🗑 Reset
                                                                  </button>
@@ -2155,7 +3691,6 @@
                                                          <span class="font-semibold text-shieldBlue">{profile.hash}</span>
                                                      </div>
                                                  </div>
-
                                                  <div class="flex justify-between items-center text-[9px] text-slate-500 font-mono pt-1">
                                                      <div class="flex items-center gap-2">
                                                          <button
@@ -2170,8 +3705,29 @@
                                                      <button 
                                                          onClick={() => {
                                                              if(profile.id <= 2) return alert("System protected profiles cannot be deleted.");
-                                                             setTrustedProfiles(prev => prev.filter(p => p.id !== profile.id));
-                                                             playChime(440, 0.1);
+                                                             
+                                                             // Instantly remove from local state and localStorage
+                                                             setTrustedProfiles(prev => prev.filter(p => p.phone !== profile.phone));
+                                                             let savedLocal = [];
+                                                             try {
+                                                                 const saved = localStorage.getItem('scamShieldVoiceProfiles');
+                                                                 if (saved) savedLocal = JSON.parse(saved);
+                                                             } catch(e) {}
+                                                             const updatedLocal = savedLocal.filter(p => p.phone !== profile.phone);
+                                                             localStorage.setItem('scamShieldVoiceProfiles', JSON.stringify(updatedLocal));
+
+                                                             fetch(`/api/voice-profiles/${profile.id}`, { 
+                                                                 method: 'DELETE',
+                                                                 headers: {
+                                                                     'x-user-id': userId
+                                                                 }
+                                                             })
+                                                                 .then(res => {
+                                                                     if(res.ok) {
+                                                                         playChime(440, 0.1);
+                                                                     }
+                                                                 })
+                                                                 .catch(err => console.error("Error deleting profile:", err));
                                                          }}
                                                          class="text-slate-600 hover:text-shieldRed transition-all uppercase font-bold"
                                                      >
@@ -2250,40 +3806,81 @@
                                 </div>
 
                                 <div class="bg-slate-950 border border-slate-900 rounded-xl p-4 flex flex-col gap-3">
-                                    <div class="flex items-center justify-between border-b border-slate-900 pb-2">
+                                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-900 pb-2 gap-2">
                                         <div class="flex items-center gap-1.5">
                                             <span class="w-2 h-2 rounded-full bg-shieldBlue animate-ping"></span>
                                             <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-300">Scam Detection Pipeline Progress</span>
                                         </div>
-                                        <span class="text-[9px] font-mono text-slate-500">Active Scenario: {scenarios[selectedScenario].name}</span>
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <div class="flex bg-slate-900 p-0.5 rounded-lg border border-slate-805">
+                                                <button 
+                                                    onClick={() => setArchPipelineMode('twilio')}
+                                                    class={`px-2 py-0.5 text-[9px] rounded font-bold transition-all ${archPipelineMode === 'twilio' ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/20' : 'text-slate-500 hover:text-slate-300'}`}
+                                                >
+                                                    Twilio Stream Flow
+                                                </button>
+                                                <button 
+                                                    onClick={() => setArchPipelineMode('speaker')}
+                                                    class={`px-2 py-0.5 text-[9px] rounded font-bold transition-all ${archPipelineMode === 'speaker' ? 'bg-shieldBlue/15 text-shieldBlue border border-shieldBlue/20' : 'text-slate-500 hover:text-slate-300'}`}
+                                                >
+                                                    Speaker Mic Flow
+                                                </button>
+                                            </div>
+                                            <span class="text-[9px] font-mono text-slate-500">
+                                                {archPipelineMode === 'twilio' ? `Active Scenario: ${scenarios[selectedScenario].name}` : `Status: ${speakerActive ? 'Speaker Active' : 'Speaker Idle'}`}
+                                            </span>
+                                        </div>
                                     </div>
                                     <div class="grid grid-cols-2 md:grid-cols-7 gap-2 items-center">
-                                        {[
-                                            { label: 'Unknown Call', emoji: '📞', status: step1 },
-                                            { label: 'Transcript', emoji: '🎙️', status: step2 },
-                                            { label: 'Voice Analysis', emoji: '🔊', status: step3 },
-                                            { label: 'Scam Detection', emoji: '🧠', status: step4 },
-                                            { label: 'Reputation Check', emoji: '🛡️', status: step5 },
-                                            { label: 'AI Risk Score', emoji: '⚠️', status: step6 },
-                                            { label: 'User Alert', emoji: '🚨', status: step7 }
-                                        ].map((item, index) => (
-                                            <div key={index} class="flex items-center gap-1 w-full">
-                                                <div class={`flex-1 p-2 rounded-lg border flex items-center justify-between transition-all ${
-                                                    item.status.icon === '✓' 
-                                                        ? 'bg-shieldGreen/5 border-shieldGreen/30 text-shieldGreen shadow-glowGreen/10' 
-                                                        : item.status.icon === '⟳'
-                                                            ? 'bg-shieldOrange/10 border-shieldOrange/40 text-shieldOrange shadow-glowOrange/10 animate-pulse'
-                                                            : 'bg-slate-900/40 border-slate-900 text-slate-500 opacity-60'
-                                                }`}>
-                                                    <span class="text-xs">{item.emoji}</span>
-                                                    <span class="text-[9px] font-bold truncate mx-1">{item.label}</span>
-                                                    <span class="text-[10px] font-black font-mono">{item.status.icon}</span>
+                                        {(() => {
+                                            const getSpeakerStepStatus = (idx) => {
+                                                if (idx === 0) return { icon: '✓' };
+                                                if (idx === 1) return speakerActive ? { icon: '✓' } : { icon: '⚪' };
+                                                if (idx === 2) return speakerTelemetrySteps.includes("Microphone Active") ? { icon: '✓' } : (speakerActive ? { icon: '⟳' } : { icon: '⚪' });
+                                                if (idx === 3) return speakerTranscript ? { icon: '✓' } : (speakerTelemetrySteps.includes("Microphone Active") ? { icon: '⟳' } : { icon: '⚪' });
+                                                if (idx === 4) return speakerScore > 0 ? { icon: '✓' } : (speakerTranscript ? { icon: '⟳' } : { icon: '⚪' });
+                                                if (idx === 5) return speakerScore > 0 ? { icon: '✓' } : (speakerScore === 0 && speakerTranscript ? { icon: '⟳' } : { icon: '⚪' });
+                                                if (idx === 6) return speakerScore >= 70 ? { icon: '✓' } : { icon: '⚪' };
+                                                return { icon: '⚪' };
+                                            };
+                                            const twilioSteps = [
+                                                { label: 'Unknown Call', emoji: '📞', status: step1 },
+                                                { label: 'Transcript', emoji: '🎙️', status: step2 },
+                                                { label: 'Voice Analysis', emoji: '🔊', status: step3 },
+                                                { label: 'Scam Detection', emoji: '🧠', status: step4 },
+                                                { label: 'Reputation Check', emoji: '🛡️', status: step5 },
+                                                { label: 'AI Risk Score', emoji: '⚠️', status: step6 },
+                                                { label: 'User Alert', emoji: '🚨', status: step7 }
+                                            ];
+                                            const speakerSteps = [
+                                                { label: 'Unknown Call', emoji: '📞', status: getSpeakerStepStatus(0) },
+                                                { label: 'Speaker Mode', emoji: '🔊', status: getSpeakerStepStatus(1) },
+                                                { label: 'Mic Capture', emoji: '🎙️', status: getSpeakerStepStatus(2) },
+                                                { label: 'Transcript', emoji: '📝', status: getSpeakerStepStatus(3) },
+                                                { label: 'Scam Detection', emoji: '🧠', status: getSpeakerStepStatus(4) },
+                                                { label: 'Risk Score', emoji: '📊', status: getSpeakerStepStatus(5) },
+                                                { label: 'User Alert', emoji: '🚨', status: getSpeakerStepStatus(6) }
+                                            ];
+                                            const activeSteps = archPipelineMode === 'twilio' ? twilioSteps : speakerSteps;
+                                            return activeSteps.map((item, index) => (
+                                                <div key={index} class="flex items-center gap-1 w-full">
+                                                    <div class={`flex-1 p-2 rounded-lg border flex items-center justify-between transition-all ${
+                                                        item.status.icon === '✓' 
+                                                            ? 'bg-shieldGreen/5 border-shieldGreen/30 text-shieldGreen shadow-glowGreen/10' 
+                                                            : item.status.icon === '⟳'
+                                                                ? 'bg-shieldOrange/10 border-shieldOrange/40 text-shieldOrange shadow-glowOrange/10 animate-pulse'
+                                                                : 'bg-slate-900/40 border-slate-900 text-slate-500 opacity-60'
+                                                    }`}>
+                                                        <span class="text-xs">{item.emoji}</span>
+                                                        <span class="text-[9px] font-bold truncate mx-1">{item.label}</span>
+                                                        <span class="text-[10px] font-black font-mono">{item.status.icon}</span>
+                                                    </div>
+                                                    {index < 6 && (
+                                                        <span class="text-slate-800 hidden md:inline font-mono">→</span>
+                                                    )}
                                                 </div>
-                                                {index < 6 && (
-                                                    <span class="text-slate-800 hidden md:inline font-mono">→</span>
-                                                )}
-                                            </div>
-                                        ))}
+                                            ));
+                                        })()}
                                     </div>
                                 </div>
 
@@ -2370,7 +3967,7 @@
                                         <div class="text-[8px] font-mono font-bold text-shieldBlue uppercase tracking-widest">Step 4: Scam Pattern Detection</div>
                                         <div class="flex flex-col gap-1.5 mt-1.5">
                                             {currentScenario.patterns.map((pt, idx) => (
-                                                <div key={idx} class="flex justify-between items-center border-b border-slate-800/40 pb-1 text-[9px]">
+                                                <div key={idx} class="flex justify-between items-center border-b border-slate-805/40 pb-1 text-[9px]">
                                                     <span class="text-slate-400 font-semibold">{pt.name}</span>
                                                     <span>
                                                         {stepIndex >= 3 ? (
@@ -2509,7 +4106,7 @@
                                                 onClick={() => { playChime(330, 0.4); alert("Interception bridge terminated caller connection."); }}
                                                 class="w-full bg-shieldRed hover:bg-shieldRed/95 text-slate-950 font-black py-1.5 rounded-lg text-[10px] uppercase transition-all tracking-wider flex items-center justify-center gap-1.5"
                                             >
-                                                🟥 End Call
+                                                Analyse Call Stream
                                             </button>
                                             <div class="grid grid-cols-2 gap-2">
                                                 <button 
