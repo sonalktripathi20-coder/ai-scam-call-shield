@@ -512,6 +512,7 @@
             const speakerAudioCtxRef = useRef(null);
             const speakerRecognitionRef = useRef(null);
             const speakerCanvasRef = useRef(null);
+            const speakerStreamRef = useRef(null);
 
             // Log database
             const [reports, setReports] = useState([
@@ -1189,9 +1190,9 @@
                     "Monitoring Started"
                 ]);
                 setSpeakerInstructionVisible(true);
- 
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    speakerStreamRef.current = stream;
                     setSpeakerTelemetrySteps(prev => [...prev, "Microphone Active", "AI Shield Enabled"]);
                     setSpeakerActive(true);
                     playChime(659, 0.15);
@@ -1199,6 +1200,12 @@
                     try {
                         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
                         const audioCtx = new AudioContextClass();
+                        
+                        // Force resume on mobile browsers (Safari/Chrome require this to start Web Audio)
+                        if (audioCtx.state === 'suspended') {
+                            await audioCtx.resume();
+                        }
+                        
                         const source = audioCtx.createMediaStreamSource(stream);
                         const analyser = audioCtx.createAnalyser();
                         analyser.fftSize = 256;
@@ -1208,20 +1215,6 @@
                         speakerAnalyserRef.current = analyser;
                     } catch (e) {
                         console.error("Web Audio API not fully supported:", e);
-                    }
- 
-                    try {
-                        const mediaRecorder = new MediaRecorder(stream);
-                        speakerMediaRecorderRef.current = mediaRecorder;
-                        speakerAudioChunksRef.current = [];
-                        mediaRecorder.ondataavailable = (event) => {
-                            if (event.data.size > 0) {
-                                speakerAudioChunksRef.current.push(event.data);
-                            }
-                        };
-                        mediaRecorder.start(1000);
-                    } catch (e) {
-                        console.error("MediaRecorder setup failed:", e);
                     }
  
                     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1250,7 +1243,7 @@
                                 ...prev,
                                 { sender: 'caller', text: newPhrase }
                             ]);
-
+ 
                             setSpeakerTranscript(prev => {
                                 const newT = (prev + " " + newPhrase).trim();
                                 updateSpeakerBadges(newT);
@@ -1294,21 +1287,20 @@
                 setSpeakerActive(false);
                 setSpeakerInstructionVisible(false);
                 setIsSimulatingSpeaker(false);
-
+ 
                 // Cancel all scheduled simulation timeouts
                 speakerTimeoutsRef.current.forEach(t => clearTimeout(t));
                 speakerTimeoutsRef.current = [];
-
+ 
                 if (speakerScoreIntervalRef.current) {
                     clearInterval(speakerScoreIntervalRef.current);
                     speakerScoreIntervalRef.current = null;
                 }
  
-                if (speakerMediaRecorderRef.current && speakerMediaRecorderRef.current.state !== 'inactive') {
-                    try { speakerMediaRecorderRef.current.stop(); } catch(e) {}
-                }
-                if (speakerMediaRecorderRef.current && speakerMediaRecorderRef.current.stream) {
-                    speakerMediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+                // Properly stop the stream tracks to release microphone lock on mobile
+                if (speakerStreamRef.current) {
+                    speakerStreamRef.current.getTracks().forEach(track => track.stop());
+                    speakerStreamRef.current = null;
                 }
                 if (speakerRecognitionRef.current) {
                     try { speakerRecognitionRef.current.stop(); } catch(e) {}
