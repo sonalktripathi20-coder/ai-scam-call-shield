@@ -1228,7 +1228,7 @@
                     }
 
                     const recognition = new SpeechRecognitionClass();
-                    recognition.continuous = true;
+                    recognition.continuous = !isMobileDevice; // False on mobile to force auto-restart on pauses
                     recognition.interimResults = true;
                     recognition.lang = speakerLanguage;
 
@@ -1266,7 +1266,9 @@
 
                     recognition.onend = () => {
                         if (speakerActive) {
-                            try { recognition.start(); } catch(err) {}
+                            setTimeout(() => {
+                                try { recognition.start(); } catch(err) {}
+                            }, 200);
                         }
                     };
 
