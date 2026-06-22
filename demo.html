@@ -1237,6 +1237,8 @@
                         recognition.continuous = !isMobileDevice; // False on mobile to force auto-restart on pauses
                         recognition.interimResults = true;
                         recognition.lang = speakerLanguageRef.current;
+                        
+                        let restartDelay = 1000; // 1-second default safety delay to prevent rate limits
 
                         recognition.onresult = (event) => {
                             let finalTranscript = '';
@@ -1264,6 +1266,9 @@
                             console.error("Speech recognition error:", e.error);
                             if (e.error === 'not-allowed') {
                                 setSpeechSupportError('Microphone permission denied by browser.');
+                            } else if (e.error === 'network') {
+                                setSpeechSupportError('Speech API rate limit or network issue. Reconnecting in 3s...');
+                                restartDelay = 3000;
                             }
                         };
 
@@ -1271,7 +1276,7 @@
                             if (speakerActiveRef.current) {
                                 setTimeout(() => {
                                     runRecognition(); // Restart fresh
-                                }, 250);
+                                }, restartDelay);
                             }
                         };
 
