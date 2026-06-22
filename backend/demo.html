@@ -1191,6 +1191,7 @@
                 try {
                     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
                     setSpeakerActive(true);
+                    speakerActiveRef.current = true; // Set synchronously to avoid React state batching delays
                     playChime(659, 0.15);
 
                     if (isMobileDevice) {
@@ -1302,6 +1303,7 @@
  
             const stopSpeakerListening = () => {
                 setSpeakerActive(false);
+                speakerActiveRef.current = false; // Set synchronously to avoid React state batching delays
                 setSpeakerInstructionVisible(false);
                 setIsSimulatingSpeaker(false);
  
