@@ -513,6 +513,7 @@
             const speakerRecognitionRef = useRef(null);
             const speakerCanvasRef = useRef(null);
             const speakerStreamRef = useRef(null);
+            const speakerActiveRef = useRef(false);
 
             // Log database
             const [reports, setReports] = useState([
@@ -1270,7 +1271,7 @@
                     };
 
                     recognition.onend = () => {
-                        if (speakerActive) {
+                        if (speakerActiveRef.current) {
                             setTimeout(() => {
                                 try { recognition.start(); } catch(err) {}
                             }, 200);
@@ -1340,6 +1341,10 @@
             useEffect(() => {
                 speakerScoreRef.current = speakerScore;
             }, [speakerScore]);
+
+            useEffect(() => {
+                speakerActiveRef.current = speakerActive;
+            }, [speakerActive]);
 
             useEffect(() => {
                 const canvas = speakerCanvasRef.current;
