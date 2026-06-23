@@ -1190,12 +1190,21 @@
 
                 try {
                     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+                    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
                     setSpeakerActive(true);
                     speakerActiveRef.current = true; // Set synchronously to avoid React state batching delays
                     playChime(659, 0.15);
 
                     if (isMobileDevice) {
                         setSpeakerTelemetrySteps(prev => [...prev, "Microphone Active (Mobile Optimized)", "AI Shield Enabled"]);
+                        if (isIOS) {
+                            try {
+                                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                                speakerStreamRef.current = stream;
+                            } catch (e) {
+                                console.error("iOS getUserMedia failed:", e);
+                            }
+                        }
                     } else {
                         try {
                             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -1231,7 +1240,7 @@
                         }
 
                         const recognition = new SpeechRecognitionClass();
-                        recognition.continuous = !isMobileDevice; // False on mobile to force auto-restart on pauses
+                        recognition.continuous = true; // Enabled continuous natively, fallback restart via onend
                         recognition.interimResults = true;
                         recognition.lang = speakerLanguageRef.current;
                         
