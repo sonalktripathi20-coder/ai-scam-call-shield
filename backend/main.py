@@ -112,13 +112,21 @@ MIC_DEMO_FILE = os.path.join(os.path.dirname(__file__), "mic_demo.html")
 @app.get("/")
 def root():
     if os.path.exists(DEMO_FILE):
-        return FileResponse(DEMO_FILE, media_type="text/html")
+        response = FileResponse(DEMO_FILE, media_type="text/html")
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
     return {"status": "AI Scam Shield API running", "docs": "/docs"}
 
 @app.get("/mic")
 def mic_demo():
     if os.path.exists(MIC_DEMO_FILE):
-        return FileResponse(MIC_DEMO_FILE, media_type="text/html")
+        response = FileResponse(MIC_DEMO_FILE, media_type="text/html")
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
     return {"error": "mic_demo.html not found"}
 
 @app.get("/static/sample_audio.wav")
