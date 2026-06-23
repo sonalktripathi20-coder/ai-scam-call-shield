@@ -1352,11 +1352,19 @@
             const speakerScoreRef = useRef(speakerScore);
             useEffect(() => {
                 speakerScoreRef.current = speakerScore;
-                if (speakerScore >= 70 && navigator.vibrate) {
+                if (speakerScore >= 70) {
                     try {
-                        navigator.vibrate([300, 100, 300, 100, 300]);
+                        playChime(880, 0.35);
+                        setTimeout(() => playChime(880, 0.35), 400);
                     } catch (e) {
-                        console.error("Vibration failed:", e);
+                        console.error("Alert chime failed:", e);
+                    }
+                    if (navigator.vibrate) {
+                        try {
+                            navigator.vibrate([300, 100, 300, 100, 300]);
+                        } catch (e) {
+                            console.error("Vibration failed:", e);
+                        }
                     }
                 }
             }, [speakerScore]);
@@ -2811,6 +2819,79 @@
                                                 })}
                                             </div>
                                         </div>
+
+                                        {/* Live AI Confidence Gauges */}
+                                        <div class="mt-4 border-t border-darkBorder/40 pt-3">
+                                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider block mb-2">Live AI Detection Analytics</span>
+                                            <div class="grid grid-cols-3 gap-2">
+                                                {/* Gauge 1: NLP Fraud */}
+                                                <div class="bg-slate-950/60 border border-darkBorder/40 rounded-xl p-2 flex flex-col gap-1 items-center justify-center">
+                                                    <div class="text-[8px] font-bold text-slate-400 uppercase tracking-wider text-center">NLP Fraud Index</div>
+                                                    <div class="relative w-10 h-10 flex items-center justify-center mt-0.5">
+                                                        <svg class="w-full h-full transform -rotate-90">
+                                                            <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.05)" stroke-width="2.5" fill="transparent" />
+                                                            <circle cx="20" cy="20" r="16" 
+                                                                stroke={speakerScore >= 70 ? '#EF4444' : speakerScore >= 40 ? '#F97316' : '#10B981'} 
+                                                                stroke-width="3" 
+                                                                fill="transparent" 
+                                                                stroke-dasharray={`${2 * Math.PI * 16}`} 
+                                                                stroke-dashoffset={`${2 * Math.PI * 16 * (1 - speakerScore / 100)}`}
+                                                                class="transition-all duration-500 ease-out"
+                                                            />
+                                                        </svg>
+                                                        <span class="absolute text-[9px] font-black text-white font-mono">{speakerScore}%</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Gauge 2: Acoustic Stress */}
+                                                <div class="bg-slate-950/60 border border-darkBorder/40 rounded-xl p-2 flex flex-col gap-1 items-center justify-center">
+                                                    <div class="text-[8px] font-bold text-slate-400 uppercase tracking-wider text-center">Acoustic Stress</div>
+                                                    {(() => {
+                                                        const stressVal = speakerBadges.urgencyDetected ? 89 : (speakerTranscript ? 18 : 0);
+                                                        return (
+                                                            <div class="relative w-10 h-10 flex items-center justify-center mt-0.5">
+                                                                <svg class="w-full h-full transform -rotate-90">
+                                                                    <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.05)" stroke-width="2.5" fill="transparent" />
+                                                                    <circle cx="20" cy="20" r="16" 
+                                                                        stroke={stressVal >= 70 ? '#EF4444' : '#10B981'} 
+                                                                        stroke-width="3" 
+                                                                        fill="transparent" 
+                                                                        stroke-dasharray={`${2 * Math.PI * 16}`} 
+                                                                        stroke-dashoffset={`${2 * Math.PI * 16 * (1 - stressVal / 100)}`}
+                                                                        class="transition-all duration-500 ease-out"
+                                                                    />
+                                                                </svg>
+                                                                <span class="absolute text-[9px] font-black text-white font-mono">{stressVal}%</span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+
+                                                {/* Gauge 3: Deepfake Biometrics */}
+                                                <div class="bg-slate-950/60 border border-darkBorder/40 rounded-xl p-2 flex flex-col gap-1 items-center justify-center">
+                                                    <div class="text-[8px] font-bold text-slate-400 uppercase tracking-wider text-center">Voice Clone Prob</div>
+                                                    {(() => {
+                                                        const cloneVal = speakerBadges.possibleSyntheticSpeech ? 94 : (speakerTranscript ? 4 : 0);
+                                                        return (
+                                                            <div class="relative w-10 h-10 flex items-center justify-center mt-0.5">
+                                                                <svg class="w-full h-full transform -rotate-90">
+                                                                    <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.05)" stroke-width="2.5" fill="transparent" />
+                                                                    <circle cx="20" cy="20" r="16" 
+                                                                        stroke={cloneVal >= 70 ? '#EF4444' : '#10B981'} 
+                                                                        stroke-width="3" 
+                                                                        fill="transparent" 
+                                                                        stroke-dasharray={`${2 * Math.PI * 16}`} 
+                                                                        stroke-dashoffset={`${2 * Math.PI * 16 * (1 - cloneVal / 100)}`}
+                                                                        class="transition-all duration-500 ease-out"
+                                                                    />
+                                                                </svg>
+                                                                <span class="absolute text-[9px] font-black text-white font-mono">{cloneVal}%</span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* 3. Security Statistics Panel */}
@@ -3004,79 +3085,6 @@
                                             <div class="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Live Capture Transcript</div>
                                             <div class="bg-slate-950 border border-darkBorder rounded-lg p-2.5 min-h-[50px] max-h-[80px] overflow-y-auto text-xs text-slate-300 leading-normal font-mono select-all font-semibold">
                                                 {speakerTranscript || <span class="text-slate-600 italic font-normal">No audio captured yet. Start speaking or click simulation...</span>}
-                                            </div>
-                                        </div>
-
-                                        {/* Live AI Confidence Gauges */}
-                                        <div class="mt-3 border-t border-darkBorder/40 pt-3">
-                                            <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider block mb-2">Live AI Detection Analytics</span>
-                                            <div class="grid grid-cols-3 gap-2">
-                                                {/* Gauge 1: NLP Fraud */}
-                                                <div class="bg-slate-950/60 border border-darkBorder/40 rounded-xl p-2 flex flex-col gap-1 items-center justify-center">
-                                                    <div class="text-[8px] font-bold text-slate-400 uppercase tracking-wider text-center">NLP Fraud Index</div>
-                                                    <div class="relative w-10 h-10 flex items-center justify-center mt-0.5">
-                                                        <svg class="w-full h-full transform -rotate-90">
-                                                            <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.05)" stroke-width="2.5" fill="transparent" />
-                                                            <circle cx="20" cy="20" r="16" 
-                                                                stroke={speakerScore >= 70 ? '#EF4444' : speakerScore >= 40 ? '#F97316' : '#10B981'} 
-                                                                stroke-width="3" 
-                                                                fill="transparent" 
-                                                                stroke-dasharray={`${2 * Math.PI * 16}`} 
-                                                                stroke-dashoffset={`${2 * Math.PI * 16 * (1 - speakerScore / 100)}`}
-                                                                class="transition-all duration-500 ease-out"
-                                                            />
-                                                        </svg>
-                                                        <span class="absolute text-[9px] font-black text-white font-mono">{speakerScore}%</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Gauge 2: Acoustic Stress */}
-                                                <div class="bg-slate-950/60 border border-darkBorder/40 rounded-xl p-2 flex flex-col gap-1 items-center justify-center">
-                                                    <div class="text-[8px] font-bold text-slate-400 uppercase tracking-wider text-center">Acoustic Stress</div>
-                                                    {(() => {
-                                                        const stressVal = speakerBadges.urgencyDetected ? 89 : (speakerTranscript ? 18 : 0);
-                                                        return (
-                                                            <div class="relative w-10 h-10 flex items-center justify-center mt-0.5">
-                                                                <svg class="w-full h-full transform -rotate-90">
-                                                                    <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.05)" stroke-width="2.5" fill="transparent" />
-                                                                    <circle cx="20" cy="20" r="16" 
-                                                                        stroke={stressVal >= 70 ? '#EF4444' : '#10B981'} 
-                                                                        stroke-width="3" 
-                                                                        fill="transparent" 
-                                                                        stroke-dasharray={`${2 * Math.PI * 16}`} 
-                                                                        stroke-dashoffset={`${2 * Math.PI * 16 * (1 - stressVal / 100)}`}
-                                                                        class="transition-all duration-500 ease-out"
-                                                                    />
-                                                                </svg>
-                                                                <span class="absolute text-[9px] font-black text-white font-mono">{stressVal}%</span>
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </div>
-
-                                                {/* Gauge 3: Deepfake Biometrics */}
-                                                <div class="bg-slate-950/60 border border-darkBorder/40 rounded-xl p-2 flex flex-col gap-1 items-center justify-center">
-                                                    <div class="text-[8px] font-bold text-slate-400 uppercase tracking-wider text-center">Voice Clone Prob</div>
-                                                    {(() => {
-                                                        const cloneVal = speakerBadges.possibleSyntheticSpeech ? 94 : (speakerTranscript ? 4 : 0);
-                                                        return (
-                                                            <div class="relative w-10 h-10 flex items-center justify-center mt-0.5">
-                                                                <svg class="w-full h-full transform -rotate-90">
-                                                                    <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.05)" stroke-width="2.5" fill="transparent" />
-                                                                    <circle cx="20" cy="20" r="16" 
-                                                                        stroke={cloneVal >= 70 ? '#EF4444' : '#10B981'} 
-                                                                        stroke-width="3" 
-                                                                        fill="transparent" 
-                                                                        stroke-dasharray={`${2 * Math.PI * 16}`} 
-                                                                        stroke-dashoffset={`${2 * Math.PI * 16 * (1 - cloneVal / 100)}`}
-                                                                        class="transition-all duration-500 ease-out"
-                                                                    />
-                                                                </svg>
-                                                                <span class="absolute text-[9px] font-black text-white font-mono">{cloneVal}%</span>
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </div>
                                             </div>
                                         </div>
                                     </div>
