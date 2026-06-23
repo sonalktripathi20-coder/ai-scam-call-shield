@@ -2887,6 +2887,95 @@
                                         </div>
                                     </div>
 
+                                    {/* Explainable AI (XAI) Risk Factors breakdown */}
+                                    {speakerActive && currentSpeakerScenario && (
+                                        <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 border border-slate-800/80 animate-fade-in">
+                                            <span class="text-xs font-black uppercase text-slate-400 tracking-wider flex items-center gap-1.5">
+                                                🔬 Explainable AI (XAI) Threat Report
+                                            </span>
+                                            
+                                            <div class="flex flex-col gap-3 font-mono text-[10px]">
+                                                {currentSpeakerScenario === 'bank_otp' && (
+                                                    <>
+                                                        <div class="border-b border-darkBorder/30 pb-2">
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">🏦 IDENTITY CLAIMS</span>
+                                                                <span class="text-shieldOrange font-extrabold text-[9px]">SBI Bank Impersonation</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">Caller claimed official bank validation without prompt.</div>
+                                                        </div>
+                                                        <div class="border-b border-darkBorder/30 pb-2">
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">🚨 COERCION PRESENCE</span>
+                                                                <span class="text-shieldRed font-extrabold text-[9px]">95% URGENCY PRESSURE</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">Extremely high verbal pressure: "immediately blocked".</div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">🔑 CREDENTIAL VECTORS</span>
+                                                                <span class="text-shieldRed font-extrabold text-[9px]">OTP EXTORTION MATCH</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">Demanded "6-digit OTP code" sent to device.</div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                                
+                                                {currentSpeakerScenario === 'voice_clone' && (
+                                                    <>
+                                                        <div class="border-b border-darkBorder/30 pb-2">
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">👩‍👦 IDENTITY CLAIMS</span>
+                                                                <span class="text-shieldRed font-extrabold text-[9px]">Kin Impersonation Claim</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">Claims family relation ("Sonal") from unknown number.</div>
+                                                        </div>
+                                                        <div class="border-b border-darkBorder/30 pb-2">
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">🚨 COERCION PRESENCE</span>
+                                                                <span class="text-shieldOrange font-extrabold text-[9px]">85% EMOTIONAL URGENCY</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">Manipulative emotional urgency: "damaged phone, clinic".</div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">💸 CREDENTIAL VECTORS</span>
+                                                                <span class="text-shieldRed font-extrabold text-[9px]">UPI FUND TRANSFER</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">Requested direct "UPI transfer of rupees 10,000".</div>
+                                                        </div>
+                                                    </>
+                                                )}
+
+                                                {currentSpeakerScenario === 'delivery' && (
+                                                    <>
+                                                        <div class="border-b border-darkBorder/30 pb-2">
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">📦 IDENTITY CLAIMS</span>
+                                                                <span class="text-shieldGreen font-bold text-[9px]">Logistic Courier Verified</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">Amazon logistics delivery service coordination.</div>
+                                                        </div>
+                                                        <div class="border-b border-darkBorder/30 pb-2">
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">🚨 COERCION PRESENCE</span>
+                                                                <span class="text-shieldGreen font-bold text-[9px]">0% PRESSURE</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">Standard delivery dropoff coordination. No pressure detected.</div>
+                                                        </div>
+                                                        <div>
+                                                            <div class="flex justify-between items-center mb-1">
+                                                                <span class="text-slate-400 font-bold">💸 CREDENTIAL VECTORS</span>
+                                                                <span class="text-shieldGreen font-bold text-[9px]">NO TRANSACTION VECTOR</span>
+                                                            </div>
+                                                            <div class="text-[9px] text-slate-500 leading-normal">No payment requested, normal delivery dropoff.</div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* 3. Security Statistics Panel */}
                                     <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 border border-slate-800/80">
                                         <span class="text-xs font-black uppercase text-slate-400 tracking-wider">Global Threat Intelligence logs</span>
