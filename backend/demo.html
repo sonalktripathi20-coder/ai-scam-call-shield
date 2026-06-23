@@ -463,6 +463,38 @@
             // Shield status
             const [shieldActive, setShieldActive] = useState(true);
 
+            // Radar Feed state & simulator
+            const [radarAlerts, setRadarAlerts] = useState([
+                { id: 1, type: 'BLOCKED', hub: 'Jamtara OTP Ring', target: '+91 98451 XXXXX', time: 'Just now' },
+                { id: 2, type: 'INTERCEPTED', hub: 'Mewat Voice Clone', target: '+91 70192 XXXXX', time: '2 min ago' },
+                { id: 3, type: 'CLEAN', hub: 'Verified Delivery', target: '+91 90123 XXXXX', time: '5 min ago' },
+            ]);
+
+            useEffect(() => {
+                const hubs = [
+                    { type: 'BLOCKED', hub: 'Jamtara OTP Ring', target: '+91 98231 XXXXX' },
+                    { type: 'INTERCEPTED', hub: 'Mewat Voice Clone', target: '+91 70182 XXXXX' },
+                    { type: 'BLOCKED', hub: 'Gurgaon Bank Spoof', target: '+91 90124 XXXXX' },
+                    { type: 'CLEAN', hub: 'Amazon Courier', target: '+91 88123 XXXXX' },
+                    { type: 'BLOCKED', hub: 'Delhi Customs Scam', target: '+91 95482 XXXXX' }
+                ];
+                const interval = setInterval(() => {
+                    const randomHub = hubs[Math.floor(Math.random() * hubs.length)];
+                    setRadarAlerts(prev => [
+                        { id: Date.now(), ...randomHub, time: 'Just now' },
+                        ...prev.map(p => {
+                            if (p.time === 'Just now') return { ...p, time: '1 min ago' };
+                            if (p.time.includes('min')) {
+                                const mins = parseInt(p.time) + 1;
+                                return { ...p, time: `${mins} min ago` };
+                            }
+                            return p;
+                        })
+                    ].slice(0, 3));
+                }, 6000);
+                return () => clearInterval(interval);
+            }, []);
+
             // Task checklist states
             const [dbSyncState, setDbSyncState] = useState('stale'); // 'stale' | 'syncing' | 'synced'
             const [hookVerifyState, setHookVerifyState] = useState('unverified'); // 'unverified' | 'verifying' | 'verified'
@@ -2395,6 +2427,90 @@
                                                         </div>
                                                     </div>
                                                 ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Live Cyber Threat Radar */}
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 relative overflow-hidden mt-6">
+                                        <style>{`
+                                            @keyframes radar-sweep {
+                                                from { transform: rotate(0deg); }
+                                                to { transform: rotate(360deg); }
+                                            }
+                                            @keyframes ping-glow {
+                                                0% { transform: scale(0.9); opacity: 0.6; }
+                                                50% { transform: scale(1.3); opacity: 1; filter: drop-shadow(0 0 4px currentColor); }
+                                                100% { transform: scale(0.9); opacity: 0.6; }
+                                            }
+                                        `}</style>
+                                        <div class="flex items-center justify-between">
+                                            <h2 class="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                                                <span>🛰️ LIVE SCAM PROBING RADAR FEED</span>
+                                            </h2>
+                                            <span class="text-[8px] font-mono px-2 py-0.5 bg-shieldRed/10 text-shieldRed rounded border border-shieldRed/20 animate-pulse uppercase font-black">ACTIVE THREAT INTELLIGENCE</span>
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+                                            {/* Radar Visualization Screen */}
+                                            <div class="md:col-span-5 flex justify-center">
+                                                <div class="relative w-32 h-32 rounded-full border border-shieldBlue/20 bg-slate-950 flex items-center justify-center overflow-hidden">
+                                                    {/* Circular grid rings */}
+                                                    <div class="absolute w-24 h-24 rounded-full border border-shieldBlue/10"></div>
+                                                    <div class="absolute w-16 h-16 rounded-full border border-shieldBlue/10"></div>
+                                                    <div class="absolute w-8 h-8 rounded-full border border-shieldBlue/10"></div>
+                                                    {/* Radar Crosshairs */}
+                                                    <div class="absolute h-full w-[1px] bg-shieldBlue/5"></div>
+                                                    <div class="absolute w-full h-[1px] bg-shieldBlue/5"></div>
+                                                    
+                                                    {/* Sweep line */}
+                                                    <div 
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: '50%',
+                                                            left: '50%',
+                                                            width: '50%',
+                                                            height: '2px',
+                                                            background: 'linear-gradient(90deg, rgba(16,185,129,0.8) 0%, rgba(16,185,129,0) 100%)',
+                                                            transformOrigin: '0% 50%',
+                                                            animation: 'radar-sweep 4s linear infinite',
+                                                        }}
+                                                    ></div>
+
+                                                    {/* Scanning glowing points */}
+                                                    <div class="absolute top-[25%] left-[30%] w-2 h-2 rounded-full bg-shieldRed animate-pulse"></div>
+                                                    <span class="absolute top-[13%] left-[34%] text-[7px] font-mono text-shieldRed/80 font-bold uppercase scale-[0.8] tracking-tighter">Mewat</span>
+
+                                                    <div class="absolute bottom-[28%] right-[22%] w-2 h-2 rounded-full bg-shieldRed animate-pulse"></div>
+                                                    <span class="absolute bottom-[16%] right-[24%] text-[7px] font-mono text-shieldRed/80 font-bold uppercase scale-[0.8] tracking-tighter">Jamtara</span>
+
+                                                    <div class="absolute top-[60%] left-[20%] w-2 h-2 rounded-full bg-shieldGreen animate-pulse"></div>
+                                                    <span class="absolute top-[49%] left-[24%] text-[7px] font-mono text-shieldGreen/80 font-bold uppercase scale-[0.8] tracking-tighter">Safe Call</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Live intercepted log feed ticker */}
+                                            <div class="md:col-span-7 flex flex-col gap-2">
+                                                <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider font-mono">Live Intercept Logs</span>
+                                                <div class="flex flex-col gap-2 min-h-[110px] justify-center">
+                                                    {radarAlerts.map((log) => (
+                                                        <div key={log.id} class="flex items-center justify-between p-2 bg-slate-900/60 border border-darkBorder/45 rounded-xl animate-fade-in">
+                                                            <div class="flex items-center gap-2">
+                                                                <span class={`w-1.5 h-1.5 rounded-full ${log.type === 'CLEAN' ? 'bg-shieldGreen' : log.type === 'INTERCEPTED' ? 'bg-shieldOrange' : 'bg-shieldRed'}`}></span>
+                                                                <div>
+                                                                    <div class="text-[10px] font-mono font-bold text-slate-200">{log.hub}</div>
+                                                                    <div class="text-[8px] font-mono text-slate-500">{log.target}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div class="text-right">
+                                                                <span class={`text-[8px] font-mono font-bold px-1.5 py-0.2 rounded ${log.type === 'CLEAN' ? 'bg-shieldGreen/10 text-shieldGreen' : log.type === 'INTERCEPTED' ? 'bg-shieldOrange/10 text-shieldOrange' : 'bg-shieldRed/10 text-shieldRed'}`}>
+                                                                    {log.type}
+                                                                </span>
+                                                                <span class="text-[8px] font-mono text-slate-500 block mt-0.5">{log.time}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
