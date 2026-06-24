@@ -521,6 +521,11 @@
             const [simRisk, setSimRisk] = useState('LOW');
             const [simActiveIndicators, setSimActiveIndicators] = useState([]);
 
+            // Adaptive Detection Engine & Timeline states
+            const [detectionMode, setDetectionMode] = useState('balanced'); // 'conservative' | 'balanced' | 'aggressive' | 'elderly'
+            const [detectionSensitivity, setDetectionSensitivity] = useState(70); // range: 50-90
+            const [riskTimelineEvents, setRiskTimelineEvents] = useState([]); // array of { time: string, factor: string, weight: number, cumulative: number }
+
             // Speaker Mode Demo States
             const [speakerActive, setSpeakerActive] = useState(false);
             const [speakerTranscript, setSpeakerTranscript] = useState('');
@@ -1798,6 +1803,17 @@
                 } catch (e) {}
             };
 
+            // Adaptive Weight presets based on Detection Mode
+            const getRiskWeights = (mode) => {
+                const weights = {
+                    conservative: { otp: 20, money: 25, urgency: 15, unknown: 5, voice: 60, reputation: 10 },
+                    balanced: { otp: 25, money: 30, urgency: 20, unknown: 10, voice: 45, reputation: 15 },
+                    aggressive: { otp: 35, money: 40, urgency: 30, unknown: 20, voice: 35, reputation: 25 },
+                    elderly: { otp: 30, money: 35, urgency: 25, unknown: 15, voice: 55, reputation: 20 }
+                };
+                return weights[mode] || weights.balanced;
+            };
+
             // Start simulator
             const startSimulation = (key) => {
                 setSimKey(key);
@@ -1807,14 +1823,25 @@
                 setSimScore(0);
                 setSimRisk('LOW');
                 setSimActiveIndicators([]);
+                setRiskTimelineEvents([]); // Clear timeline
                 playChime(523, 0.3); // C5 ring
             };
 
             // Handle Ringing Answer
             const answerCall = () => {
                 setSimState('active');
-                setSimScore(15);
+                
+                // Calculate dynamic starting score based on current weights
+                const weights = getRiskWeights(detectionMode);
+                const totalWeightMax = Object.values(weights).reduce((a, b) => a + b, 0);
+                const initialScore = Math.round((weights.unknown / totalWeightMax) * 100);
+                
+                setSimScore(initialScore);
                 setSimActiveIndicators(["Unknown Number"]);
+                setRiskTimelineEvents([
+                    { time: '0s', factor: 'Unknown Number Detected', weight: weights.unknown, cumulative: initialScore }
+                ]);
+                
                 playChime(659, 0.15); // E5 answer
                 if (simKey === 'voice_clone') {
                     setVoiceMatchStatus('analyzing');
@@ -1833,40 +1860,78 @@
                         const line = scenario.dialogue[simLineIndex];
                         setSimTranscript(prev => [...prev, line]);
 
-                        // Update metrics dynamically
-                        const progress = (simLineIndex + 1) / scenario.dialogue.length;
-                        const targetScore = scenario.score;
-                        let currentScore = Math.min(100, Math.round(progress * targetScore));
-                        if (simKey === 'voice_clone' && simLineIndex >= 2) {
-                            currentScore = 98; // Mismatch makes it critical instantly!
-                        }
-                        setSimScore(currentScore);
-
-                        // Set risk levels
-                        if (currentScore >= 75) setSimRisk('CRITICAL');
-                        else if (currentScore >= 45) setSimRisk('HIGH');
-                        else if (currentScore >= 20) setSimRisk('MEDIUM');
-                        else setSimRisk('LOW');
-
-                        // Update indicators
+                        // Determine new indicators based on line content
                         const textLower = line.toLowerCase();
                         const newIndicators = [];
-                        newIndicators.push("Unknown Number");
-                        if (textLower.includes("bank") || textLower.includes("hdfc") || textLower.includes("sbi") || textLower.includes("card")) {
-                            newIndicators.push("Banking Keywords");
+                        
+                        if (textLower.includes("bank") || textLower.includes("hdfc") || textLower.includes("sbi") || textLower.includes("card") || textLower.includes("cbi") || textLower.includes("police") || textLower.includes("inspector") || textLower.includes("customs") || textLower.includes("fedex")) {
+                            newIndicators.push("Impersonation Attempt");
                         }
-                        if (textLower.includes("immediately") || textLower.includes("right now") || textLower.includes("quickly") || textLower.includes("arrest")) {
+                        if (textLower.includes("immediately") || textLower.includes("right now") || textLower.includes("quickly") || textLower.includes("urgent") || textLower.includes("bleeding") || textLower.includes("stolen")) {
                             newIndicators.push("Urgency Language");
                         }
-                        if (textLower.includes("otp") || textLower.includes("code") || textLower.includes("verify") || textLower.includes("number")) {
+                        if (textLower.includes("otp") || textLower.includes("code") || textLower.includes("verify") || textLower.includes("number") || textLower.includes("credentials") || textLower.includes("pan")) {
                             newIndicators.push("Verification Request");
                         }
-                        if (simKey === 'voice_clone') {
-                            newIndicators.push("Voice Analysis Running");
-                            if (simLineIndex >= 1) newIndicators.push("Synthetic Voice Indicators");
+                        if (textLower.includes("paise") || textLower.includes("rupees") || textLower.includes("money") || textLower.includes("upi") || textLower.includes("transfer") || textLower.includes("deposit") || textLower.includes("fee")) {
+                            newIndicators.push("Money Request");
+                        }
+                        if (simKey === 'voice_clone' && simLineIndex >= 1) {
+                            newIndicators.push("Synthetic Voice Indicators");
                         }
 
-                        setSimActiveIndicators(prev => Array.from(new Set([...prev, ...newIndicators])));
+                        // Calculate current score using local weights
+                        const weights = getRiskWeights(detectionMode);
+                        const totalWeightMax = Object.values(weights).reduce((a, b) => a + b, 0);
+
+                        setSimActiveIndicators(prev => {
+                            const updated = Array.from(new Set([...prev, "Unknown Number", ...newIndicators]));
+                            
+                            // Calculate score dynamically
+                            let sumWeight = weights.unknown;
+                            updated.forEach(ind => {
+                                if (ind === "Verification Request") sumWeight += weights.otp;
+                                if (ind === "Money Request") sumWeight += weights.money;
+                                if (ind === "Urgency Language") sumWeight += weights.urgency;
+                                if (ind === "Synthetic Voice Indicators") sumWeight += weights.voice;
+                                if (ind === "Impersonation Attempt") sumWeight += weights.reputation;
+                            });
+
+                            const currentScore = Math.min(100, Math.round((sumWeight / totalWeightMax) * 100));
+                            setSimScore(currentScore);
+
+                            // Update risk level based on threshold comparison
+                            if (currentScore >= detectionSensitivity) setSimRisk('CRITICAL');
+                            else if (currentScore >= 45) setSimRisk('HIGH');
+                            else if (currentScore >= 20) setSimRisk('MEDIUM');
+                            else setSimRisk('LOW');
+
+                            // Add to timeline
+                            const seconds = `${(simLineIndex + 1) * 3}s`;
+                            newIndicators.forEach(ind => {
+                                let wValue = 0;
+                                if (ind === "Verification Request") wValue = weights.otp;
+                                if (ind === "Money Request") wValue = weights.money;
+                                if (ind === "Urgency Language") wValue = weights.urgency;
+                                if (ind === "Synthetic Voice Indicators") wValue = weights.voice;
+                                if (ind === "Impersonation Attempt") wValue = weights.reputation;
+
+                                if (wValue > 0) {
+                                    setRiskTimelineEvents(tPrev => {
+                                        if (tPrev.some(evt => evt.factor === ind)) return tPrev;
+                                        return [...tPrev, {
+                                            time: seconds,
+                                            factor: ind,
+                                            weight: wValue,
+                                            cumulative: currentScore
+                                        }];
+                                    });
+                                }
+                            });
+
+                            return updated;
+                        });
+
                         playChime(784, 0.1); // G5 stream tick
 
                         // Voice clone specific biometric verification states
@@ -1887,8 +1952,17 @@
                             }
                         }
 
-                        // If risk hits alert threshold (only for other scenarios; voice_clone auto-blocks)
-                        if (simKey !== 'voice_clone' && currentScore >= 75 && simLineIndex === scenario.dialogue.length - 1) {
+                        // Determine final possible score of this scenario to see if it should alert
+                        let finalScorePossible = weights.unknown;
+                        if (scenario.indicators.includes("Verification Request") || scenario.indicators.includes("OTP Request")) finalScorePossible += weights.otp;
+                        if (scenario.indicators.includes("Money Request") || scenario.indicators.includes("Direct Fund Demands") || scenario.indicators.includes("Financial Information Request")) finalScorePossible += weights.money;
+                        if (scenario.indicators.includes("Urgency Language") || scenario.indicators.includes("Urgency Tactics")) finalScorePossible += weights.urgency;
+                        if (scenario.indicators.includes("Synthetic Voice Indicators") || scenario.indicators.includes("Synthetic Acoustic Signatures Detected") || scenario.indicators.includes("Voice Clone Indicators") || scenario.indicators.includes("Voice Analysis Running")) finalScorePossible += weights.voice;
+                        if (scenario.indicators.includes("Impersonation Attempt") || scenario.indicators.includes("Government Impersonation") || scenario.indicators.includes("Kinship Spoofing Patterns")) finalScorePossible += weights.reputation;
+                        
+                        const calculatedFinalScore = Math.min(100, Math.round((finalScorePossible / totalWeightMax) * 100));
+
+                        if (simKey !== 'voice_clone' && calculatedFinalScore >= detectionSensitivity && simLineIndex === scenario.dialogue.length - 1) {
                             setTimeout(() => {
                                 setSimState('alert');
                                 playChime(987, 0.4); // B5 alarm
@@ -1900,12 +1974,23 @@
                     return () => clearTimeout(timer);
                 } else {
                     // Scenario finished
-                    if (scenario.score < 75) {
+                    const weights = getRiskWeights(detectionMode);
+                    const totalWeightMax = Object.values(weights).reduce((a, b) => a + b, 0);
+                    let finalScorePossible = weights.unknown;
+                    if (scenario.indicators.includes("Verification Request") || scenario.indicators.includes("OTP Request")) finalScorePossible += weights.otp;
+                    if (scenario.indicators.includes("Money Request") || scenario.indicators.includes("Direct Fund Demands") || scenario.indicators.includes("Financial Information Request")) finalScorePossible += weights.money;
+                    if (scenario.indicators.includes("Urgency Language") || scenario.indicators.includes("Urgency Tactics")) finalScorePossible += weights.urgency;
+                    if (scenario.indicators.includes("Synthetic Voice Indicators") || scenario.indicators.includes("Synthetic Acoustic Signatures Detected") || scenario.indicators.includes("Voice Clone Indicators") || scenario.indicators.includes("Voice Analysis Running")) finalScorePossible += weights.voice;
+                    if (scenario.indicators.includes("Impersonation Attempt") || scenario.indicators.includes("Government Impersonation") || scenario.indicators.includes("Kinship Spoofing Patterns")) finalScorePossible += weights.reputation;
+                    
+                    const calculatedFinalScore = Math.min(100, Math.round((finalScorePossible / totalWeightMax) * 100));
+
+                    if (calculatedFinalScore < detectionSensitivity) {
                         setSimState('evidence');
                         saveToLogs(scenario, simScore, "Completed (Clean)");
                     }
                 }
-            }, [simState, simLineIndex, simKey]);
+            }, [simState, simLineIndex, simKey, detectionMode, detectionSensitivity]);
 
             // Save call results to log dashboard
             const saveToLogs = (scenario, score, statusText) => {
@@ -2618,6 +2703,21 @@
                                     <span class="text-[10px] px-2.5 py-1 bg-slate-800 border border-slate-700 text-slate-300 rounded-lg font-mono">
                                         RESTRICTION: SANDBOX MIC CAPTURE
                                     </span>
+                                </div>
+                            </div>
+
+                            {/* Prototype Demonstration Mode Alert */}
+                            <div class="bg-gradient-to-r from-blue-950/20 to-indigo-950/20 border border-shieldBlue/30 p-5 rounded-2xl flex items-start gap-4 animate-fade-in">
+                                <span class="text-2xl mt-0.5">💡</span>
+                                <div>
+                                    <h4 class="text-xs font-bold text-shieldBlue uppercase tracking-wider">Prototype Demonstration Mode</h4>
+                                    <p class="text-xs text-slate-300 mt-1 leading-relaxed">
+                                        Due to Android & iOS security sandbox privacy restrictions, this client-side web prototype captures caller voice streams through <strong>Speaker Mode loopback simulation</strong> (placing the calling phone's speaker next to this device's microphone).
+                                    </p>
+                                    <div class="flex flex-wrap gap-x-6 gap-y-1.5 mt-3 text-[10px] text-slate-400 font-mono">
+                                        <span>• <strong class="text-slate-300">Production Telephony:</strong> Uses native Android Telecom Framework & <code>CallScreeningService</code> APIs</span>
+                                        <span>• <strong class="text-slate-300">Carrier Intercept:</strong> Integrates with VoIP SIP trunking & cloud carrier bridges (e.g. Twilio Voice Conference)</span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -3415,6 +3515,111 @@
                                         </button>
                                     )}
                                 </div>
+
+                                {/* Card 2: Adaptive Security Settings */}
+                                <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 mt-4">
+                                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full shadow-glowGreen"></span>
+                                        🛡️ Adaptive Security Settings
+                                    </h3>
+                                    
+                                    {/* Detection Modes */}
+                                    <div class="flex flex-col gap-2">
+                                        <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider font-mono">Detection Mode Preset</span>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            {[
+                                                { id: 'conservative', name: '🛡️ Conservative', desc: 'High Threshold' },
+                                                { id: 'balanced', name: '⚖️ Balanced', desc: 'Standard Shield' },
+                                                { id: 'aggressive', name: '⚡ Aggressive', desc: 'Ultra-Sensitive' },
+                                                { id: 'elderly', name: '👴 Elderly Protect', desc: 'Max Strictness' }
+                                            ].map(mode => (
+                                                <button
+                                                    key={mode.id}
+                                                    onClick={() => {
+                                                        setDetectionMode(mode.id);
+                                                        if (mode.id === 'conservative') setDetectionSensitivity(80);
+                                                        else if (mode.id === 'balanced') setDetectionSensitivity(70);
+                                                        else if (mode.id === 'aggressive') setDetectionSensitivity(50);
+                                                        else if (mode.id === 'elderly') setDetectionSensitivity(55);
+                                                    }}
+                                                    class={`p-2 rounded-xl text-left border transition-all ${detectionMode === mode.id ? 'bg-shieldBlue/15 border-shieldBlue' : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'}`}
+                                                >
+                                                    <div class="text-[10px] font-bold text-slate-100">{mode.name}</div>
+                                                    <div class="text-[8px] text-slate-400 mt-0.5">{mode.desc}</div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Sensitivity Slider */}
+                                    <div class="flex flex-col gap-2 mt-1">
+                                        <div class="flex justify-between items-center text-[9px] font-black text-slate-500 uppercase tracking-wider font-mono">
+                                            <span>Detection Sensitivity</span>
+                                            <span class="text-shieldBlue font-bold">{detectionSensitivity}%</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="50"
+                                            max="90"
+                                            value={detectionSensitivity}
+                                            onChange={(e) => setDetectionSensitivity(parseInt(e.target.value))}
+                                            class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-shieldBlue"
+                                        />
+                                        <div class="flex justify-between text-[8px] text-slate-400 font-mono">
+                                            <span>50 (Aggressive)</span>
+                                            <span>70 (Balanced)</span>
+                                            <span>90 (Conservative)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Card 3: Explainable AI Timeline */}
+                                {simState === 'active' && (
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 mt-4 animate-fade-in">
+                                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                            <span class="w-1.5 h-1.5 bg-shieldOrange rounded-full shadow-glowOrange animate-pulse"></span>
+                                            🔍 Explainable AI (XAI) Timeline
+                                        </h3>
+
+                                        {/* Score breakdown metrics */}
+                                        <div class="bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl flex justify-between items-center">
+                                            <div>
+                                                <div class="text-[9px] font-bold text-slate-500 uppercase font-mono">Current Fraud Score</div>
+                                                <div class="text-xl font-black text-slate-100 font-mono mt-0.5">{simScore}%</div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="text-[9px] font-bold text-slate-500 uppercase font-mono">Status vs Threshold ({detectionSensitivity}%)</div>
+                                                <span class={`text-[9px] font-bold px-2 py-0.5 rounded mt-1 inline-block ${simScore >= detectionSensitivity ? 'bg-shieldRed/15 text-shieldRed border border-shieldRed/30' : 'bg-shieldGreen/15 text-shieldGreen border border-shieldGreen/30'}`}>
+                                                    {simScore >= detectionSensitivity ? '🚨 THREAT EXCEEDED' : '✓ SECURE SCREENING'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Cumulative Risk Incremental Feed */}
+                                        <div class="flex flex-col gap-3">
+                                            <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider font-mono">Risk Expansion Timeline</span>
+                                            <div class="relative border-l border-slate-800 ml-2 pl-4 flex flex-col gap-4">
+                                                {riskTimelineEvents.map((evt, idx) => (
+                                                    <div key={idx} class="relative flex flex-col gap-0.5 animate-slide-up">
+                                                        {/* Timeline node */}
+                                                        <span class="absolute -left-[21px] top-1.5 w-1.5 h-1.5 rounded-full bg-shieldOrange border border-slate-950 shadow-glowOrange"></span>
+                                                        <div class="flex justify-between items-center text-[10px] font-bold text-slate-300">
+                                                            <span>{evt.factor}</span>
+                                                            <span class="text-shieldOrange">+{evt.weight}</span>
+                                                        </div>
+                                                        <div class="flex justify-between items-center text-[8px] text-slate-500 font-mono">
+                                                            <span>Elapsed: {evt.time}</span>
+                                                            <span>Cumulative: {evt.cumulative}%</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {riskTimelineEvents.length === 0 && (
+                                                    <div class="text-[10px] text-slate-600 italic">Analyzing incoming voice stream...</div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Simulator Right Panel: The Virtual Smartphone Frame */}
