@@ -3472,51 +3472,8 @@
                             
                             {/* Simulator Left Panel: Select scenario to start */}
                             <div class="lg:col-span-5 flex flex-col gap-5">
+                                {/* Card 1: Adaptive Security Settings */}
                                 <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4">
-                                    <h3 class="text-sm font-extrabold text-white tracking-wider flex items-center gap-2">
-                                        <span class="w-2 h-2 bg-shieldBlue rounded-full shadow-glowBlue"></span>
-                                        SCENARIO TESTING HUB
-                                    </h3>
-                                    <p class="text-xs text-slate-400 leading-normal">
-                                        Choose one of the phone call scenarios below. The virtual mobile emulator on the right will simulate how the AI Interceptor shields you in real-time.
-                                    </p>
-
-                                    <div class="flex flex-col gap-2.5 mt-2">
-                                        {[
-                                            { id: 'bank', name: '🏦 Bank Manager Spoof', type: 'OTP Scam Verification' },
-                                            { id: 'police', name: '👮 Police Extortion Scare', type: 'Legal Threat Extortion' },
-                                            { id: 'voice_clone', name: '👨‍👦 AI Voice-Cloned Son', type: 'Impersonation Deepfake' },
-                                            { id: 'courier', name: '📦 Courier Customs Agent', type: 'Aadhaar ID phishing' },
-                                            { id: 'safe', name: '🟢 Verified Amazon Courier', type: 'Safe logistics call' }
-                                        ].map(item => (
-                                            <button 
-                                                key={item.id}
-                                                onClick={() => startSimulation(item.id)}
-                                                class={`w-full p-3 bg-slate-900/60 border rounded-xl text-left transition-all hover:bg-slate-900 flex justify-between items-center ${simKey === item.id && simState !== 'idle' ? 'border-shieldBlue bg-slate-800' : 'border-darkBorder'}`}
-                                            >
-                                                <div>
-                                                    <div class="text-xs font-bold text-slate-200">{item.name}</div>
-                                                    <p class="text-[9px] text-slate-500 mt-0.5">{item.type}</p>
-                                                </div>
-                                                <span class="text-[10px] font-bold text-shieldBlue flex items-center gap-1">
-                                                    Simulate <Icon name="arrowRight" className="w-3 h-3" />
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {simState !== 'idle' && (
-                                        <button 
-                                            onClick={resetSimulator}
-                                            class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs mt-2"
-                                        >
-                                            Reset Mobile Emulator
-                                        </button>
-                                    )}
-                                </div>
-
-                                {/* Card 2: Adaptive Security Settings */}
-                                <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 mt-4">
                                     <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-2">
                                         <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full shadow-glowGreen"></span>
                                         🛡️ Adaptive Security Settings
@@ -3572,9 +3529,9 @@
                                     </div>
                                 </div>
 
-                                {/* Card 3: Explainable AI Timeline */}
+                                {/* Card 2: Explainable AI Timeline */}
                                 {simState === 'active' && (
-                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 mt-4 animate-fade-in">
+                                    <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4 animate-fade-in">
                                         <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-2">
                                             <span class="w-1.5 h-1.5 bg-shieldOrange rounded-full shadow-glowOrange animate-pulse"></span>
                                             🔍 Explainable AI (XAI) Timeline
@@ -3619,6 +3576,50 @@
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Card 3: Scenario Testing Hub */}
+                                <div class="glass-panel rounded-2xl p-6 flex flex-col gap-4">
+                                    <h3 class="text-sm font-extrabold text-white tracking-wider flex items-center gap-2">
+                                        <span class="w-2 h-2 bg-shieldBlue rounded-full shadow-glowBlue"></span>
+                                        SCENARIO TESTING HUB
+                                    </h3>
+                                    <p class="text-xs text-slate-400 leading-normal">
+                                        Choose one of the phone call scenarios below. The virtual mobile emulator on the right will simulate how the AI Interceptor shields you in real-time.
+                                    </p>
+
+                                    <div class="flex flex-col gap-2.5 mt-2">
+                                        {[
+                                            { id: 'bank', name: '🏦 Bank Manager Spoof', type: 'OTP Scam Verification' },
+                                            { id: 'police', name: '👮 Police Extortion Scare', type: 'Legal Threat Extortion' },
+                                            { id: 'voice_clone', name: '👨‍👦 AI Voice-Cloned Son', type: 'Impersonation Deepfake' },
+                                            { id: 'courier', name: '📦 Courier Customs Agent', type: 'Aadhaar ID phishing' },
+                                            { id: 'safe', name: '🟢 Verified Amazon Courier', type: 'Safe logistics call' }
+                                        ].map(item => (
+                                            <button 
+                                                key={item.id}
+                                                onClick={() => startSimulation(item.id)}
+                                                class={`w-full p-3 bg-slate-900/60 border rounded-xl text-left transition-all hover:bg-slate-900 flex justify-between items-center ${simKey === item.id && simState !== 'idle' ? 'border-shieldBlue bg-slate-800' : 'border-darkBorder'}`}
+                                            >
+                                                <div>
+                                                    <div class="text-xs font-bold text-slate-200">{item.name}</div>
+                                                    <p class="text-[9px] text-slate-500 mt-0.5">{item.type}</p>
+                                                </div>
+                                                <span class="text-[10px] font-bold text-shieldBlue flex items-center gap-1">
+                                                    Simulate <Icon name="arrowRight" className="w-3 h-3" />
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {simState !== 'idle' && (
+                                        <button 
+                                            onClick={resetSimulator}
+                                            class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs mt-2"
+                                        >
+                                            Reset Mobile Emulator
+                                        </button>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Simulator Right Panel: The Virtual Smartphone Frame */}
