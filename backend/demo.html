@@ -293,6 +293,42 @@
             }
         };
 
+        const getScoreForStep = (key, idx) => {
+            const scores = {
+                bank: [15, 35, 58, 92],
+                voice_clone: [15, 45, 75, 96],
+                police: [15, 35, 60, 88],
+                courier: [15, 35, 55, 85],
+                safe: [10, 12, 12, 12]
+            };
+            const list = scores[key] || [15, 35, 55, 75];
+            return list[Math.min(idx, list.length - 1)];
+        };
+
+        const getLineInsights = (text, key) => {
+            const textLower = text.toLowerCase();
+            const insights = [];
+            if (textLower.includes("bank") || textLower.includes("hdfc") || textLower.includes("sbi") || textLower.includes("card")) {
+                insights.push("Brand Impersonation");
+            }
+            if (textLower.includes("cbi") || textLower.includes("police") || textLower.includes("inspector") || textLower.includes("customs") || textLower.includes("fedex")) {
+                insights.push("Authority Impersonation");
+            }
+            if (textLower.includes("immediately") || textLower.includes("right now") || textLower.includes("quickly") || textLower.includes("urgent") || textLower.includes("bleeding") || textLower.includes("stolen")) {
+                insights.push("Urgency Coercion");
+            }
+            if (textLower.includes("otp") || textLower.includes("code") || textLower.includes("verify") || textLower.includes("number") || textLower.includes("credentials") || textLower.includes("pan")) {
+                insights.push("OTP / Credential Request");
+            }
+            if (textLower.includes("paise") || textLower.includes("rupees") || textLower.includes("money") || textLower.includes("upi") || textLower.includes("transfer") || textLower.includes("deposit") || textLower.includes("fee")) {
+                insights.push("Fund Transfer Demand");
+            }
+            if (key === 'voice_clone' && (textLower.includes("dad") || textLower.includes("sonal") || textLower.includes("phone") || textLower.includes("help"))) {
+                insights.push("AI Voice Clone Signature");
+            }
+            return insights;
+        };
+
         function App() {
             // User Isolation States
             const [userName, setUserName] = useState(() => {
@@ -1827,15 +1863,11 @@
             const answerCall = () => {
                 setSimState('active');
                 
-                // Calculate dynamic starting score based on current weights
-                const weights = getRiskWeights(detectionMode);
-                const totalWeightMax = Object.values(weights).reduce((a, b) => a + b, 0);
-                const initialScore = Math.round((weights.unknown / totalWeightMax) * 100);
-                
+                const initialScore = simKey === 'safe' ? 10 : 15;
                 setSimScore(initialScore);
                 setSimActiveIndicators(["Unknown Number"]);
                 setRiskTimelineEvents([
-                    { time: '0s', factor: 'Unknown Number Detected', weight: weights.unknown, cumulative: initialScore }
+                    { time: '0s', factor: 'Unknown Number Detected', weight: 10, cumulative: initialScore }
                 ]);
                 
                 playChime(659, 0.15); // E5 answer
@@ -1854,7 +1886,9 @@
                 if (simLineIndex < scenario.dialogue.length) {
                     const timer = setTimeout(() => {
                         const line = scenario.dialogue[simLineIndex];
-                        setSimTranscript(prev => [...prev, line]);
+                        const lineInsights = getLineInsights(line, simKey);
+                        
+                        setSimTranscript(prev => [...prev, { text: line, insights: lineInsights }]);
 
                         // Determine new indicators based on line content
                         const textLower = line.toLowerCase();
@@ -1876,24 +1910,10 @@
                             newIndicators.push("Synthetic Voice Indicators");
                         }
 
-                        // Calculate current score using local weights
-                        const weights = getRiskWeights(detectionMode);
-                        const totalWeightMax = Object.values(weights).reduce((a, b) => a + b, 0);
-
                         setSimActiveIndicators(prev => {
                             const updated = Array.from(new Set([...prev, "Unknown Number", ...newIndicators]));
                             
-                            // Calculate score dynamically
-                            let sumWeight = weights.unknown;
-                            updated.forEach(ind => {
-                                if (ind === "Verification Request") sumWeight += weights.otp;
-                                if (ind === "Money Request") sumWeight += weights.money;
-                                if (ind === "Urgency Language") sumWeight += weights.urgency;
-                                if (ind === "Synthetic Voice Indicators") sumWeight += weights.voice;
-                                if (ind === "Impersonation Attempt") sumWeight += weights.reputation;
-                            });
-
-                            const currentScore = Math.min(100, Math.round((sumWeight / totalWeightMax) * 100));
+                            const currentScore = getScoreForStep(simKey, simLineIndex);
                             setSimScore(currentScore);
 
                             // Update risk level based on threshold comparison
@@ -1903,6 +1923,7 @@
                             else setSimRisk('LOW');
 
                             // Add to timeline
+                            const weights = getRiskWeights(detectionMode);
                             const seconds = `${(simLineIndex + 1) * 3}s`;
                             newIndicators.forEach(ind => {
                                 let wValue = 0;
@@ -1949,16 +1970,8 @@
                         }
 
                         // Determine final possible score of this scenario to see if it should alert
-                        let finalScorePossible = weights.unknown;
-                        if (scenario.indicators.includes("Verification Request") || scenario.indicators.includes("OTP Request")) finalScorePossible += weights.otp;
-                        if (scenario.indicators.includes("Money Request") || scenario.indicators.includes("Direct Fund Demands") || scenario.indicators.includes("Financial Information Request")) finalScorePossible += weights.money;
-                        if (scenario.indicators.includes("Urgency Language") || scenario.indicators.includes("Urgency Tactics")) finalScorePossible += weights.urgency;
-                        if (scenario.indicators.includes("Synthetic Voice Indicators") || scenario.indicators.includes("Synthetic Acoustic Signatures Detected") || scenario.indicators.includes("Voice Clone Indicators") || scenario.indicators.includes("Voice Analysis Running")) finalScorePossible += weights.voice;
-                        if (scenario.indicators.includes("Impersonation Attempt") || scenario.indicators.includes("Government Impersonation") || scenario.indicators.includes("Kinship Spoofing Patterns")) finalScorePossible += weights.reputation;
-                        
-                        const calculatedFinalScore = Math.min(100, Math.round((finalScorePossible / totalWeightMax) * 100));
-
-                        if (simKey !== 'voice_clone' && calculatedFinalScore >= detectionSensitivity && simLineIndex === scenario.dialogue.length - 1) {
+                        const finalScoreVal = getScoreForStep(simKey, scenario.dialogue.length - 1);
+                        if (simKey !== 'voice_clone' && finalScoreVal >= detectionSensitivity && simLineIndex === scenario.dialogue.length - 1) {
                             setTimeout(() => {
                                 setSimState('alert');
                                 playChime(987, 0.4); // B5 alarm
@@ -1970,18 +1983,8 @@
                     return () => clearTimeout(timer);
                 } else {
                     // Scenario finished
-                    const weights = getRiskWeights(detectionMode);
-                    const totalWeightMax = Object.values(weights).reduce((a, b) => a + b, 0);
-                    let finalScorePossible = weights.unknown;
-                    if (scenario.indicators.includes("Verification Request") || scenario.indicators.includes("OTP Request")) finalScorePossible += weights.otp;
-                    if (scenario.indicators.includes("Money Request") || scenario.indicators.includes("Direct Fund Demands") || scenario.indicators.includes("Financial Information Request")) finalScorePossible += weights.money;
-                    if (scenario.indicators.includes("Urgency Language") || scenario.indicators.includes("Urgency Tactics")) finalScorePossible += weights.urgency;
-                    if (scenario.indicators.includes("Synthetic Voice Indicators") || scenario.indicators.includes("Synthetic Acoustic Signatures Detected") || scenario.indicators.includes("Voice Clone Indicators") || scenario.indicators.includes("Voice Analysis Running")) finalScorePossible += weights.voice;
-                    if (scenario.indicators.includes("Impersonation Attempt") || scenario.indicators.includes("Government Impersonation") || scenario.indicators.includes("Kinship Spoofing Patterns")) finalScorePossible += weights.reputation;
-                    
-                    const calculatedFinalScore = Math.min(100, Math.round((finalScorePossible / totalWeightMax) * 100));
-
-                    if (calculatedFinalScore < detectionSensitivity) {
+                    const finalScoreVal = getScoreForStep(simKey, scenario.dialogue.length - 1);
+                    if (finalScoreVal < detectionSensitivity) {
                         setSimState('evidence');
                         saveToLogs(scenario, simScore, "Completed (Clean)");
                     }
@@ -3599,29 +3602,12 @@
                                             >
                                                 <div>
                                                     <div class="text-xs font-bold text-slate-200">{item.name}</div>
-                                                    <p class="text-[9px] text-slate-500 mt-0.5">{item.type}</p>
-                                                </div>
-                                                <span class="text-[10px] font-bold text-shieldBlue flex items-center gap-1">
-                                                    Simulate <Icon name="arrowRight" className="w-3 h-3" />
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    {simState !== 'idle' && (
-                                        <button 
-                                            onClick={resetSimulator}
-                                            class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs mt-2"
-                                        >
-                                            Reset Mobile Emulator
-                                        </button>
-                                    )}
-                                </div>
+                                                                        </div>
                             </div>
 
                             {/* Simulator Right Panel: The Virtual Smartphone Frame */}
                             <div class="lg:col-span-7 flex justify-center">
-                                <div class="phone-frame w-[360px] h-[640px] flex flex-col relative overflow-hidden">
+                                <div class="phone-frame w-[360px] h-[640px] flex flex-col relative overflow-hidden bg-slate-950/95 border border-slate-800 rounded-[36px] shadow-2xl">
                                     
                                     {/* Phone Notch/Status Bar */}
                                     <div class="bg-slate-950 px-6 py-2 flex justify-between items-center text-[10px] font-bold text-slate-500 relative z-20">
@@ -3633,13 +3619,55 @@
                                         </div>
                                     </div>
 
+                                    {/* Live Call Journey tracker progress bar */}
+                                    {simState !== 'idle' && (
+                                        <div class="bg-slate-950 border-b border-slate-900 px-3 py-2.5 flex justify-between items-center gap-1 overflow-x-auto relative z-20 select-none">
+                                            {[
+                                                { label: "Incoming", icon: "📞" },
+                                                { label: "Listening", icon: "🎤" },
+                                                { label: "Transcript", icon: "📝" },
+                                                { label: "AI Analysis", icon: "🧠" },
+                                                { label: simKey === 'safe' ? "Verified Safe" : "Scam Alert", icon: simKey === 'safe' ? "🟢" : "⚠️" },
+                                                { label: "Evidence", icon: "📄" }
+                                            ].map((st, i) => {
+                                                const activeStep = simState === 'ringing' ? 0 :
+                                                                   simState === 'active' ? (simTranscript.length === 0 ? 1 : simTranscript.length === 1 ? 2 : 3) :
+                                                                   simState === 'alert' ? 4 :
+                                                                   simState === 'evidence' ? 5 : -1;
+                                                const isCompleted = i < activeStep;
+                                                const isActive = i === activeStep;
+                                                return (
+                                                    <div key={i} class="flex items-center gap-1 flex-shrink-0">
+                                                        <div class={`flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold transition-all duration-300 ${
+                                                            isActive ? 'bg-shieldBlue text-slate-950 scale-110 shadow-[0_0_8px_rgba(14,165,233,0.5)]' : 
+                                                            isCompleted ? 'bg-shieldGreen/20 text-shieldGreen border border-shieldGreen/30' : 
+                                                            'bg-slate-900 text-slate-600 border border-slate-800'
+                                                        }`}>
+                                                            {st.icon}
+                                                        </div>
+                                                        <span class={`text-[8px] font-mono tracking-tighter transition-colors duration-300 ${
+                                                            isActive ? 'text-shieldBlue font-black' : 
+                                                            isCompleted ? 'text-shieldGreen' : 
+                                                            'text-slate-600'
+                                                        }`}>
+                                                            {st.label}
+                                                        </span>
+                                                        {i < 5 && (
+                                                            <span class="text-[8px] text-slate-800 ml-0.5">➔</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
                                     {/* Simulator Screens Content Router */}
-                                    <div class="flex-1 p-5 flex flex-col justify-between relative z-10">
+                                    <div class="flex-1 p-5 flex flex-col justify-between relative z-10 overflow-y-auto">
                                         
                                         {/* SCREEN: IDLE TELEPHONY STATE */}
                                         {simState === 'idle' && (
                                             <div class="flex-1 flex flex-col justify-center items-center gap-4 text-center">
-                                                <div class="w-20 h-20 rounded-2xl bg-slate-900/60 border-2 border-dashed border-darkBorder flex items-center justify-center text-slate-600 mb-2">
+                                                <div class="w-20 h-20 rounded-2xl bg-slate-900/60 border-2 border-dashed border-slate-800 flex items-center justify-center text-slate-600 mb-2">
                                                     <Icon name="phone" className="w-10 h-10" />
                                                 </div>
                                                 <h3 class="text-sm font-extrabold text-slate-300">TELEPHONY SIMULATOR READY</h3>
@@ -3651,7 +3679,7 @@
 
                                         {/* SCREEN 2: CALL RINGING - UNKNOWN CALL DETECTED */}
                                         {simState === 'ringing' && (
-                                            <div class="flex-1 flex flex-col justify-between py-6">
+                                            <div class="flex-1 flex flex-col justify-between py-4">
                                                 <div class="text-center flex flex-col items-center gap-2">
                                                     <div class="px-3 py-1 bg-shieldRed/10 border border-shieldRed/30 text-shieldRed rounded-full text-[9px] font-black uppercase tracking-wider animate-pulse mb-3">
                                                         ⚠️ Unknown Caller Detected
@@ -3700,10 +3728,10 @@
 
                                         {/* SCREEN 3: CALL ACTIVE - LIVE THREAT ANALYSIS */}
                                         {simState === 'active' && (
-                                            <div class="flex-1 flex flex-col justify-between gap-4 py-2">
+                                            <div class="flex-1 flex flex-col justify-between gap-4 py-1">
                                                 
                                                 {/* Call Meta */}
-                                                <div class="flex justify-between items-center bg-slate-900/60 border border-darkBorder p-2.5 rounded-xl">
+                                                <div class="flex justify-between items-center bg-slate-900/60 border border-slate-800 p-2.5 rounded-xl">
                                                     <div class="flex items-center gap-2">
                                                         <span class="w-1.5 h-1.5 bg-shieldGreen rounded-full animate-ping"></span>
                                                         <span class="text-[10px] font-bold text-slate-300 font-mono">LINE ACTIVE</span>
@@ -3715,8 +3743,8 @@
 
                                                 {/* Voice Vault Verification Widget */}
                                                 {simKey === 'voice_clone' && (
-                                                    <div class="bg-slate-950/80 border border-darkBorder rounded-xl p-3 flex flex-col gap-2 relative overflow-hidden">
-                                                        <div class="flex justify-between items-center border-b border-darkBorder/40 pb-1.5">
+                                                    <div class="bg-slate-950/80 border border-slate-850 rounded-xl p-3 flex flex-col gap-2 relative overflow-hidden">
+                                                        <div class="flex justify-between items-center border-b border-slate-900 pb-1.5">
                                                             <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
                                                                 <span class="w-2 h-2 rounded-full bg-shieldBlue animate-pulse"></span>
                                                                 Voice Vault Match
@@ -3768,15 +3796,28 @@
                                                 )}
 
                                                 {/* Live Transcript Stream */}
-                                                <div class="flex-1 flex flex-col gap-2">
-                                                    <div class="text-[9px] font-black uppercase text-slate-500 tracking-wider">🧠 Live Threat Analysis</div>
-                                                    <div class="flex-grow bg-slate-950 border border-slate-900 rounded-xl p-3 h-32 overflow-y-auto flex flex-col gap-2.5">
+                                                <div class="flex flex-col gap-2 flex-grow overflow-hidden">
+                                                    <div class="flex justify-between items-center">
+                                                        <span class="text-[9px] font-black uppercase text-slate-500 tracking-wider">Live Transcript Stream</span>
+                                                        <div class="flex items-center gap-1">
+                                                            <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                                                            <span class="text-[8px] font-mono text-slate-500">LIVE LISTENING</span>
+                                                        </div>
+                                                    </div>
+                                                    <div class="flex-grow bg-slate-950 border border-slate-900 rounded-xl p-3 h-36 overflow-y-auto flex flex-col gap-2.5">
                                                         {simTranscript.length === 0 ? (
-                                                            <span class="text-[10px] text-slate-600 italic text-center py-10">Listening to dialer audio feed...</span>
+                                                            <span class="text-[10px] text-slate-600 italic text-center py-12">Listening to dialer audio feed...</span>
                                                         ) : (
                                                             simTranscript.map((line, idx) => (
-                                                                <div key={idx} class="text-[10px] border-l border-shieldBlue pl-2.5 py-1 text-slate-300 bg-slate-900/40 rounded-r">
-                                                                    "{line}"
+                                                                <div key={idx} class="flex flex-col gap-1 text-[10px] pl-2.5 py-1.5 border-l-2 border-shieldBlue bg-slate-900/40 rounded-r-xl p-2.5 border border-slate-800/40 animate-slide-up">
+                                                                    <div class="text-[8px] font-mono uppercase text-slate-500 font-bold">Caller:</div>
+                                                                    <div class="text-slate-200">"{line.text}"</div>
+                                                                    {line.insights && line.insights.map(ins => (
+                                                                        <div key={ins} class="mt-1 flex items-center gap-1 bg-shieldRed/10 border border-shieldRed/20 text-shieldRed font-extrabold text-[7.5px] px-1.5 py-0.5 rounded w-fit">
+                                                                            <span class="w-1 h-1 rounded-full bg-shieldRed animate-ping"></span>
+                                                                            <span>🧠 AI Insight: {ins} Detected</span>
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
                                                             ))
                                                         )}
@@ -3785,7 +3826,7 @@
 
                                                 {/* Checked Indicators Grid */}
                                                 <div class="flex flex-col gap-1.5">
-                                                    <div class="text-[9px] font-black uppercase text-slate-500 tracking-wider">Scam Indicators Match</div>
+                                                    <div class="text-[9px] font-black uppercase text-slate-550 tracking-wider">Scam Indicators Match</div>
                                                     <div class="grid grid-cols-2 gap-1.5">
                                                         {SCENARIOS[simKey].indicators.map(ind => {
                                                             const active = simActiveIndicators.includes(ind);
@@ -3803,9 +3844,9 @@
                                                 </div>
 
                                                 {/* Risk level status */}
-                                                <div class="bg-slate-900/60 border border-darkBorder p-2.5 rounded-xl flex items-center justify-between">
+                                                <div class="bg-slate-900/60 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between">
                                                     <div>
-                                                        <span class="text-[8px] text-slate-500 block uppercase font-bold">Threat Evaluation Index</span>
+                                                        <span class="text-[8px] text-slate-555 block uppercase font-bold">Threat Evaluation Index</span>
                                                         <span class="text-xs font-black text-white">{simScore}% Risk</span>
                                                     </div>
                                                     <div class={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${simRisk === 'CRITICAL' ? 'bg-shieldRed/20 text-shieldRed' : simRisk === 'HIGH' ? 'bg-shieldOrange/20 text-shieldOrange' : 'bg-shieldGreen/20 text-shieldGreen'}`}>
@@ -3817,7 +3858,7 @@
                                                 <div class="flex gap-2">
                                                     <button 
                                                         onClick={blockAndSave}
-                                                        class="flex-1 py-2 bg-shieldRed/20 hover:bg-shieldRed/35 text-shieldRed border border-shieldRed/40 font-bold rounded-lg text-[10px]"
+                                                        class="w-full py-2 bg-shieldRed/20 hover:bg-shieldRed/35 text-shieldRed border border-shieldRed/40 font-bold rounded-lg text-[10px]"
                                                     >
                                                         Hang Up & Block
                                                     </button>
@@ -3842,17 +3883,17 @@
                                                 </div>
 
                                                 {/* Classification & Reasons details */}
-                                                <div class="bg-slate-900/60 border border-darkBorder rounded-xl p-3.5 flex flex-col gap-2.5 my-3">
+                                                <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2.5 my-3">
                                                     <div>
                                                         <span class="text-[8px] text-slate-500 uppercase block font-bold">Risk Classification</span>
                                                         <span class="text-xs font-black text-white">{SCENARIOS[simKey].classification}</span>
                                                     </div>
 
                                                     <div>
-                                                        <span class="text-[8px] text-slate-500 uppercase block font-bold mb-1">Evidence Summary</span>
+                                                        <span class="text-[8px] text-slate-550 uppercase block font-bold mb-1">Evidence Summary</span>
                                                         <ul class="flex flex-col gap-1">
                                                             {SCENARIOS[simKey].reasons.map((res, i) => (
-                                                                <li key={i} class="text-[9px] text-slate-300 flex items-center gap-1.5">
+                                                                <li key={i} class="text-[9px] text-slate-350 flex items-center gap-1.5 font-mono">
                                                                     <span class="text-shieldRed">✓</span> {res}
                                                                 </li>
                                                             ))}
@@ -3861,11 +3902,11 @@
                                                 </div>
 
                                                 {/* Safeguard guidelines */}
-                                                <div class="bg-slate-900/60 border border-darkBorder rounded-xl p-3.5 flex flex-col gap-2">
-                                                    <span class="text-[8px] text-slate-500 uppercase block font-bold">Recommended Actions</span>
+                                                <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 flex flex-col gap-2">
+                                                    <span class="text-[8px] text-slate-550 block uppercase font-bold">Recommended Actions</span>
                                                     <ul class="flex flex-col gap-1">
                                                         {SCENARIOS[simKey].advice.map((adv, i) => (
-                                                            <li key={i} class="text-[9px] text-slate-300 flex items-center gap-1.5">
+                                                            <li key={i} class="text-[9px] text-slate-350 flex items-center gap-1.5">
                                                                 <span class="text-shieldOrange">•</span> {adv}
                                                             </li>
                                                         ))}
@@ -3889,13 +3930,13 @@
                                                 <div class="text-center py-2 flex flex-col items-center gap-1">
                                                     <span class="text-2xl">📋</span>
                                                     <h3 class="text-xs font-black uppercase text-slate-300">Evidence Report Generated</h3>
-                                                    <p class="text-[8px] text-slate-500">Telemetry logs compiled for scam review desk.</p>
+                                                    <p class="text-[8px] text-slate-550">Telemetry logs compiled for scam review desk.</p>
                                                 </div>
 
                                                 {/* Table-style summary */}
                                                 <div class="flex-1 bg-slate-950 border border-slate-900 rounded-xl p-3 overflow-y-auto flex flex-col gap-2.5 my-2">
                                                     {simKey === 'voice_clone' && (
-                                                        <div class="text-[9px] bg-shieldRed/10 border border-shieldRed/30 p-2 rounded-lg text-shieldRed font-bold mb-2 leading-relaxed">
+                                                        <div class="text-[9px] bg-shieldRed/10 border border-shieldRed/30 p-2 rounded-lg text-shieldRed font-bold mb-2 leading-relaxed font-mono">
                                                             🚫 VOICE VAULT SHIELD ACTIVE:
                                                             Voice print characteristics (Pitch/HNR) did not match the enrolled profile of Sonal Tripathi.
                                                         </div>
@@ -3925,7 +3966,7 @@
 
                                                     <div class="text-[9px]">
                                                         <span class="text-slate-500 block">AI Explanation</span>
-                                                        <p class="text-slate-400 leading-normal mt-0.5">
+                                                        <p class="text-slate-400 leading-normal mt-0.5 font-mono">
                                                             Call matches profile signatures for {SCENARIOS[simKey].classification} by leveraging {SCENARIOS[simKey].reasons.join(" & ")}.
                                                         </p>
                                                     </div>
