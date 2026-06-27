@@ -3538,7 +3538,7 @@
                                                 "Scam Warning Generated"
                                             ].map((step, idx) => {
                                                 const isCompleted = speakerTelemetrySteps.includes(step);
-                                                if (step === "Scam Warning Generated" && speakerScore < 70) return null;
+                                                if (step === "Scam Warning Generated" && speakerScore < speakerDynamicThreshold) return null;
                                                 return (
                                                     <div key={idx} class="flex items-center gap-1.5">
                                                         <span class={isCompleted ? 'text-shieldGreen font-bold' : 'text-slate-700'}>
@@ -3601,17 +3601,29 @@
                                                 <h4 class="text-xs font-bold text-white mt-0.5">Weighted Threat Ensemble Risk</h4>
                                             </div>
                                             <div class="text-right">
-                                                <span class={`text-lg font-black font-mono ${speakerScore >= 70 ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'}`}>
+                                                <span class={`text-lg font-black font-mono ${speakerScore >= speakerDynamicThreshold ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'}`}>
                                                     {speakerScore}%
                                                 </span>
-                                                <span class={`text-[8px] font-bold block uppercase tracking-widest ${speakerScore >= 70 ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'}`}>
+                                                <span class={`text-[8px] font-bold block uppercase tracking-widest ${speakerScore >= speakerDynamicThreshold ? 'text-shieldRed' : speakerScore >= 40 ? 'text-shieldOrange' : 'text-shieldGreen'}`}>
                                                     {speakerRiskLevel}
                                                 </span>
                                             </div>
                                         </div>
 
+                                        {/* Adaptive Threshold Status */}
+                                        {dynamicThresholdEnabled && (
+                                            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[8px] font-mono bg-slate-950/50 border border-slate-900/80 p-2 rounded-lg">
+                                                <span class="text-slate-400 font-bold">⚡ ADAPTIVE THRESHOLD: {speakerDynamicThreshold}% (Base: {detectionSensitivity}%)</span>
+                                                {speakerBadges.unknownCaller && <span class="text-slate-500">-5% Unknown</span>}
+                                                {speakerBadges.otpRequest && <span class="text-shieldRed font-bold">-20% OTP Request</span>}
+                                                {speakerBadges.moneyTransfer && <span class="text-shieldRed font-bold">-15% Money Transfer</span>}
+                                                {speakerBadges.urgencyDetected && <span class="text-shieldOrange">-10% Urgency</span>}
+                                                {speakerBadges.possibleSyntheticSpeech && <span class="text-shieldRed font-bold animate-pulse">-25% Synthetic Voice</span>}
+                                            </div>
+                                        )}
+
                                         {/* Red Scam Alert Card */}
-                                        {speakerScore >= 70 && (
+                                        {speakerScore >= speakerDynamicThreshold && (
                                             <div class="p-4 bg-shieldRed/10 border-2 border-shieldRed/30 rounded-xl flex flex-col gap-3 animate-fade-in">
                                                 <div class="flex items-start gap-2.5">
                                                     <span class="text-xl">🚨</span>
