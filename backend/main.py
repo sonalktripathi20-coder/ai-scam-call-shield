@@ -418,6 +418,43 @@ def analyze_xai_threat(
     }
 
 
+def calculate_dynamic_threshold(base_threshold: float, text: str, voice_label: str, rep_data: dict, risk_factors: list) -> float:
+    # base_threshold is a fraction (e.g. 0.71)
+    val = base_threshold
+    
+    # Base Unknown caller deduction
+    val -= 0.05
+    
+    text_lower = text.lower()
+    
+    # Impersonation Attempt
+    has_impersonation = any(f.get("indicator") == "Identity Claim Verification" for f in risk_factors)
+    if has_impersonation:
+        val -= 0.10
+        
+    # Urgency Language
+    has_urgency = any("Urgent" in f.get("evidence", "") for f in risk_factors) or any(p in text_lower for p in ["immediately", "avoid arrest", "jail", "within 2 hours", "account block", "immediately block", "urgent", "urgently"])
+    if has_urgency:
+        val -= 0.10
+        
+    # Verification Request (OTP)
+    has_otp = any("OTP" in f.get("evidence", "") for f in risk_factors) or any(p in text_lower for p in ["otp", "one time password", "verification code", "digits sent", "pin code", "share your code"])
+    if has_otp:
+        val -= 0.20
+        
+    # Money Request
+    has_money = any(p in text_lower for p in ["paise", "rupees", "money", "upi", "transfer", "deposit", "fee", "payment", "pay", "bills"])
+    if has_money:
+        val -= 0.15
+        
+    # Synthetic Voice Indicators
+    if voice_label == "synthetic":
+        val -= 0.25
+        
+    # Return as fraction (clip between 0.30 and 0.95)
+    return max(0.30, min(0.95, val))
+
+
 async def _process_audio_chunk(
     pcm_bytes: bytes,
     call_sid: str,
@@ -474,8 +511,11 @@ async def _process_audio_chunk(
     xai_result = analyze_xai_threat(rolling_text, voice_label, voice_score, rep_data, from_num, db)
     score = xai_result["fraud_score"]
     label = xai_result["risk_label"]
+    
+    # Compute dynamic threshold
+    dynamic_threshold = calculate_dynamic_threshold(threshold, rolling_text, voice_label, rep_data, xai_result["risk_factors"])
 
-    print(f"[AI] call={call_sid} score={score:.3f} label={label} voice={voice_label} reputation={rep_data['reputation_label']} | '{text[:60]}'")
+    print(f"[AI] call={call_sid} score={score:.3f} label={label} voice={voice_label} reputation={rep_data['reputation_label']} threshold={dynamic_threshold:.3f} | '{text[:60]}'")
 
     # 3. Persist score event & update XAI attributes
     import json
@@ -496,12 +536,13 @@ async def _process_audio_chunk(
             "voice_score": voice_score,
             "reputation_flags": rep_data["flag_count"],
             "risk_factors": xai_result["risk_factors"],
-            "mitigation_advice": xai_result["mitigation_advice"]
+            "mitigation_advice": xai_result["mitigation_advice"],
+            "dynamic_threshold": round(dynamic_threshold * 100, 1)
         })
 
     # 5. Take action
     if not warning_sent:
-        if label == "fraud" and score >= threshold:
+        if score >= dynamic_threshold:
             # Push notification to phone
             if push_token:
                 asyncio.create_task(notify_fraud(push_token, score, from_num, call_sid))
